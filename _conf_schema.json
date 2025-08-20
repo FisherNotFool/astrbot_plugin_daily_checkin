@@ -1,0 +1,101 @@
+{
+    "initial_attributes": {
+        "description": "新用户初始五维属性值",
+        "type": "object",
+        "items": {
+            "strength": {
+                "description": "初始力量",
+                "type": "float",
+                "default": 1.0
+            },
+            "agility": {
+                "description": "初始敏捷",
+                "type": "float",
+                "default": 1.0
+            },
+            "stamina": {
+                "description": "初始体力",
+                "type": "float",
+                "default": 1.0
+            },
+            "intelligence": {
+                "description": "初始智力",
+                "type": "float",
+                "default": 1.0
+            },
+            "charisma": {
+                "description": "初始魅力",
+                "type": "float",
+                "default": 1.0
+            }
+        }
+    },
+    "check_in_settings": {
+        "description": "签到相关配置",
+        "type": "object",
+        "items": {
+            "base_rp_min": {
+                "description": "基础人品最小值",
+                "type": "int",
+                "default": 1
+            },
+            "base_rp_max": {
+                "description": "基础人品最大值",
+                "type": "int",
+                "default": 100
+            },
+            "bonus_per_day": {
+                "description": "每日连续签到倍率加成（0.02 = 2%）",
+                "type": "float",
+                "default": 0.02
+            },
+            "max_continuous_days": {
+                "description": "最高连续签到天数（达到后倍率不再增长）",
+                "type": "int",
+                "default": 15
+            }
+        }
+    },
+    "shop_settings": {
+        "description": "商店相关配置",
+        "type": "object",
+        "items": {
+            "base_price": {
+                "description": "属性的基础价格",
+                "type": "int",
+                "default": 50
+            },
+            "price_fluctuation": {
+                "description": "价格浮动百分比（0.5 = ±50%）",
+                "type": "float",
+                "default": 0.5
+            },
+            "daily_purchase_limit": {
+                "description": "全群每日共享购买次数",
+                "type": "int",
+                "default": 10
+            },
+            "attribute_increment": {
+                "description": "每次购买增加的属性点数",
+                "type": "float",
+                "default": 0.1
+            }
+        }
+    },
+    "level_formula": {
+        "description": "能级计算公式系数",
+        "type": "object",
+        "items": {
+            "linear_coefficient": {
+                "description": "Σ五维的系数",
+                "type": "float",
+                "default": 1.2
+            },
+            "square_coefficient": {
+                "description": "Σ(单项²)的系数",
+                "type": "float",
+                "default": 0.04
+            }
+        }
+    }
+}

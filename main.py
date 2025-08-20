@@ -398,28 +398,6 @@ class DailyCheckinPlugin(Star):
             f"继续加油哦~ (≧∇≦)/"
         )
 
-    @filter.command("test")
-    async def test_set_rp(self, event: AstrMessageEvent, amount: int):
-        """
-        [测试指令] 直接设置自己的人品值。
-        使用示例: /test 1000
-        """
-        user_id = event.get_sender_id()
-
-        async with self.data_lock:
-            # 检查用户是否存在，如果不存在则无法设置
-            if user_id not in self.user_data:
-                yield event.plain_result("无法设置人品：你还没有签到过，请先 /jrrp 创建角色。")
-                return
-
-            # 直接修改用户的人品值
-            self.user_data[user_id]['rp'] = amount
-
-        # 立即保存数据以确保测试结果生效
-        await self._save_data()
-
-        yield event.plain_result(f"✅ 测试指令执行成功：你的人品值已设置为 {amount}。")
-
 
     async def terminate(self):
         """

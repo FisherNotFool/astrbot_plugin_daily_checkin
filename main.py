@@ -1,7 +1,7 @@
 import asyncio
 import json
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict
 import random
 from datetime import date, timedelta
 from typing import Dict, Optional, Tuple
@@ -12,6 +12,7 @@ from astrbot.api import AstrBotConfig
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register, StarTools
 from astrbot.api import logger # 使用 astrbot 提供的 logger 接口
+from . import utils
 
 
 @register("daily_checkin", "FoolFish", "一个QQ群签到成长系统", "0.1.0")
@@ -151,7 +152,7 @@ class DailyCheckinPlugin(Star):
             # [修改] 使用新的格式生成回复
             grade, fortune = self._get_rp_grade_and_fortune(base_rp)
 
-            divider = "❀✧⋆✦❃⋆❀❃✧❀✧❃❀⋆❃✦⋆✧❀"
+            divider = "❀✧⋆✦❃⋆❃✧❀✧❃⋆❃✦⋆✧❀"
 
             rp_calc_str = f"({base_rp} {f'x {multiplier:.2f}' if multiplier > 1 else ''})"
 
@@ -168,6 +169,46 @@ class DailyCheckinPlugin(Star):
                 f"{divider}"
             )
             yield event.plain_result(reply)
+
+    @filter.command("状态", alias={'我的状态', 'status'})
+    async def show_status(self, event: AstrMessageEvent):
+        """显示用户的当前状态面板。"""
+        user_id = event.get_sender_id()
+
+        async with self.data_lock:
+            if user_id not in self.user_data:
+                yield event.plain_result("你还没有签到过，没有状态信息哦。请先使用 /jrrp 进行签到。")
+                return
+
+            user = self.user_data[user_id]
+            attrs = user["attributes"]
+            check_in = user["check_in"]
+
+            # 1. 调用 utils 中的函数进行计算
+            energy_val = utils.calculate_energy_level(attrs, self.config.get("level_formula", {}))
+            energy_rank = utils.get_energy_rank(energy_val, self.config.get("level_ranks", []))
+            derivatives = utils.calculate_derivatives(attrs)
+
+            # 2. 格式化输出
+            divider = "--- ❀ 个人状态 ❀ ---"
+            reply = (
+                f"{divider}\n"
+                f"💪 力量: {attrs.get('strength', 0):.1f}\n"
+                f"🏃 敏捷: {attrs.get('agility', 0):.1f}\n"
+                f"❤️ 体力: {attrs.get('stamina', 0):.1f}\n"
+                f"🧠 智力: {attrs.get('intelligence', 0):.1f}\n"
+                f"✨ 魅力: {attrs.get('charisma', 0):.1f}\n"
+                f"--------------------\n"
+                f"⚜️ 能级: {energy_val:.2f} ({energy_rank})\n"
+                f"💥 暴击率: {derivatives['crit_rate']:.2%}\n"
+                f"🍃 闪避率: {derivatives['dodge_rate']:.2%}\n"
+                f"❤️‍🩹 生命值: {derivatives['hp']}\n"
+                f"--------------------\n"
+                f"💰 剩余人品: {user.get('rp', 0)}\n"
+                f"📅 连续签到: {check_in.get('continuous_days', 0)} 天"
+            )
+            yield event.plain_result(reply)
+
 
 
     async def terminate(self):

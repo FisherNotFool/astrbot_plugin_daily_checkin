@@ -97,5 +97,47 @@
                 "default": 0.04
             }
         }
+    },
+    "level_ranks": {
+        "description": "能级等级划分表，从高到低配置",
+        "type": "list",
+        "default": [
+            {
+                "rank": "SSS",
+                "threshold": 351
+            },
+            {
+                "rank": "SS",
+                "threshold": 281
+            },
+            {
+                "rank": "S",
+                "threshold": 221
+            },
+            {
+                "rank": "A",
+                "threshold": 171
+            },
+            {
+                "rank": "B",
+                "threshold": 131
+            },
+            {
+                "rank": "C",
+                "threshold": 101
+            },
+            {
+                "rank": "D",
+                "threshold": 81
+            },
+            {
+                "rank": "E",
+                "threshold": 61
+            },
+            {
+                "rank": "F",
+                "threshold": 0
+            }
+        ]
     }
 }

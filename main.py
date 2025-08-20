@@ -91,9 +91,49 @@ class DailyCheckinPlugin(Star):
             except Exception as e:
                 logger.error(f"保存数据时发生错误: {e}")
 
+    async def _refresh_shop(self):
+        """刷新商店的商品价格和购买次数。"""
+        async with self.data_lock:
+            logger.info("开始每日刷新商店...")
+            cfg_shop = self.config.get("shop_settings", {})
+            base_price = cfg_shop.get("base_price", 50)
+            fluctuation = cfg_shop.get("price_fluctuation", 0.5)
+            min_price = int(base_price * (1 - fluctuation))
+            max_price = int(base_price * (1 + fluctuation))
+
+            attribute_keys = self.config.get("initial_attributes", {}).keys()
+            new_prices = {attr: random.randint(min_price, max_price) for attr in attribute_keys}
+
+            self.shop_data = {
+                "last_refresh_date": date.today().isoformat(),
+                "remaining_purchases": cfg_shop.get("daily_purchase_limit", 10),
+                "prices": new_prices
+            }
+        # 刷新是一个重要事件，立即保存一次数据
+        await self._save_data()
+        logger.info(f"商店刷新完成, 新价格: {new_prices}")
+
+
     async def initialize(self):
+        """
+        异步初始化。
+        - 加载数据
+        - 设置定时任务
+        """
         await self._load_data()
         logger.info("数据加载完成。")
+
+        # [新增] 添加每日零点刷新商店的定时任务
+        self.context.scheduler.add_job(
+            self._refresh_shop,
+            "cron",
+            hour=0,
+            minute=0,
+            id="daily_shop_refresh",
+            replace_existing=True
+        )
+        logger.info("已设置每日商店刷新任务。")
+
 
     @filter.command("jrrp", alias={'签到', '今日人品'})
     async def daily_check_in(self, event: AstrMessageEvent):
@@ -208,6 +248,68 @@ class DailyCheckinPlugin(Star):
                 f"📅 连续签到: {check_in.get('continuous_days', 0)} 天"
             )
             yield event.plain_result(reply)
+
+
+    @filter.command("商店", alias={'shop'})
+    async def show_shop(self, event: AstrMessageEvent):
+        """显示当日商店的商品价格和剩余购买次数。"""
+        # 稳健性检查：如果机器人离线错过了零点刷新，则在用户访问时手动刷新
+        if self.shop_data.get("last_refresh_date") != date.today().isoformat():
+            await self._refresh_shop()
+
+        user_id = event.get_sender_id()
+        prices = self.shop_data.get("prices", {})
+
+        # 找到最低价，用于高亮
+        min_price = min(prices.values()) if prices else 0
+
+        shop_items_str = []
+        item_icons = {
+            "strength": "💪", 
+            "agility": "⚡", 
+            "stamina": "❤️", 
+            "intelligence": "🧠", 
+            "charisma": "✨"
+        }
+        item_name_cn = {
+            "strength":"力量", 
+            "agility":"敏捷", 
+            "stamina":"体力", 
+            "intelligence":"智力", 
+            "charisma":"魅力"
+        }
+        
+        for item, price in prices.items():
+            icon = item_icons.get(item, "🎁")
+            name = item_name_cn.get(item, "未知")
+            # 为特惠商品添加特殊标记和颜色提示
+            if price == min_price:
+                shop_items_str.append(f"🔥 {icon} {name} - {price} (特惠!)")
+            else:
+                shop_items_str.append(f"   {icon} {name} - {price}")
+
+        # 获取用户人品，对新用户做兼容
+        user_rp = self.user_data.get(user_id, {}).get("rp", 0)
+        # 根据人品值添加不同的表情
+        rp_emoji = "💯" if user_rp >= 80 else "👍" if user_rp >= 60 else "😐" if user_rp >= 30 else "⚠️"
+
+        # 构建更美观的回复
+        daily_limit = self.config.get('shop_settings', {}).get('daily_purchase_limit', 10)
+        remaining = self.shop_data.get('remaining_purchases', 0)
+        
+        # 使用不同的分隔线和表情符号增强视觉效果
+        reply = (
+            "📦 今日商店 📦\n"
+            "==================\n"
+            f"{'\n'.join(shop_items_str)}\n"
+            "==================\n"
+            f"🎯 剩余购买次数: {remaining}/{daily_limit}\n"
+            f"😉 你的人品值: {user_rp} {rp_emoji}\n"
+            "💡 提示: 标有🔥的是今日特惠商品哦~"
+        )
+        yield event.plain_result(reply)
+
+
 
 
 

@@ -2,7 +2,8 @@ import asyncio
 from pathlib import Path
 from typing import Dict
 
-from astrbot.api.config import AstrBotConfig
+from astrbot.api.all import *
+from astrbot.api import AstrBotConfig
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger

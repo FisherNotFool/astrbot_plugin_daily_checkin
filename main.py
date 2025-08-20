@@ -64,11 +64,37 @@ class DailyCheckinPlugin(Star):
         await self._load_data()
         logger.info("数据加载完成。")
 
-    @filter.command("helloworld")
-    async def helloworld(self, event: AstrMessageEvent):
-        """这是一个 hello world 指令"""
-        base_price = self.config.get("shop_settings", {}).get("base_price", "未找到")
-        yield event.plain_result(f"Hello! 签到插件已加载。从配置中读取到商店基础价格为: {base_price}")
+    @filter.command("jrrp", alias={'签到', '今日人品'})
+    async def daily_check_in(self, event: AstrMessageEvent):
+        """每日签到指令，获取人品和可能的彩蛋奖励。"""
+        user_id = event.get_sender_id()
+
+        # 1. 确保用户数据结构存在
+        # 使用 async with self.data_lock 确保数据操作的原子性
+        async with self.data_lock:
+            if user_id not in self.user_data:
+                # 如果是新用户，则初始化数据
+                initial_attrs = self.config.get("initial_attributes", {})
+                self.user_data[user_id] = {
+                    "rp": 0,
+                    "attributes": {
+                        "strength": initial_attrs.get("strength", 1.0),
+                        "agility": initial_attrs.get("agility", 1.0),
+                        "stamina": initial_attrs.get("stamina", 1.0),
+                        "intelligence": initial_attrs.get("intelligence", 1.0),
+                        "charisma": initial_attrs.get("charisma", 1.0)
+                    },
+                    "check_in": {
+                        "continuous_days": 0,
+                        "last_date": "" # 空字符串表示从未签到
+                    }
+                }
+
+        # 2. 返回签到结果
+        # （我们将在下一步实现这里的详细逻辑）
+        user_rp = self.user_data[user_id].get("rp", 0)
+        yield event.plain_result(f"这是 Jrrp 指令的占位符。签到功能开发中...\n你当前的 RP 为: {user_rp}")
+
 
     async def terminate(self):
         """

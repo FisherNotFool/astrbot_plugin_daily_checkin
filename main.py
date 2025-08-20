@@ -2,6 +2,8 @@ import asyncio
 import json
 from pathlib import Path
 from typing import Dict, Optional
+from datetime import datetime, timedelta
+import random
 
 # 使用 all 导入，确保所有 API 都可用
 from astrbot.api.all import *

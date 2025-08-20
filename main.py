@@ -393,6 +393,7 @@ class DailyCheckinPlugin(Star):
             f"消耗人品：{total_cost}\n"
             f"剩余人品：{user['rp']}\n"
             f"当前{item_name}值：{new_attribute_value:.1f}({total_increment:.1f}↑)\n"
+            f"剩余总购买次数：{shop['remaining_purchases']}次\n"
             f"-------------------\n"
             f"继续加油哦~ (≧∇≦)/"
         )

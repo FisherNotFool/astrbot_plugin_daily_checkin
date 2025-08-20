@@ -118,21 +118,10 @@ class DailyCheckinPlugin(Star):
         """
         异步初始化。
         - 加载数据
-        - 设置定时任务
         """
         await self._load_data()
         logger.info("数据加载完成。")
 
-        # [新增] 添加每日零点刷新商店的定时任务
-        self.context.scheduler.add_job(
-            self._refresh_shop,
-            "cron",
-            hour=0,
-            minute=0,
-            id="daily_shop_refresh",
-            replace_existing=True
-        )
-        logger.info("已设置每日商店刷新任务。")
 
 
     @filter.command("jrrp", alias={'签到', '今日人品'})
@@ -253,7 +242,7 @@ class DailyCheckinPlugin(Star):
     @filter.command("商店", alias={'shop'})
     async def show_shop(self, event: AstrMessageEvent):
         """显示当日商店的商品价格和剩余购买次数。"""
-        # 稳健性检查：如果机器人离线错过了零点刷新，则在用户访问时手动刷新
+        # 刷新商店
         if self.shop_data.get("last_refresh_date") != date.today().isoformat():
             await self._refresh_shop()
 

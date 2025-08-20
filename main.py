@@ -151,7 +151,7 @@ class DailyCheckinPlugin(Star):
             # [修改] 使用新的格式生成回复
             grade, fortune = self._get_rp_grade_and_fortune(base_rp)
 
-            divider = "❀✧⋆✦❃✧⋆❀❃✦⋆✧❀✧⋆✦❃✧⋆❀❃✦⋆✧❀"
+            divider = "❀✧⋆✦❃⋆❀❃✧❀✧❃❀⋆❃✦⋆✧❀"
 
             rp_calc_str = f"({base_rp} {f'x {multiplier:.2f}' if multiplier > 1 else ''})"
 
@@ -159,13 +159,16 @@ class DailyCheckinPlugin(Star):
                 f"{divider}\n"
                 f"【喵星人品检测报告书】\n"
                 f"⋆⋆⃕　品级：{grade}\n"
-                f"⋆⋆⃕　人品值：{total_rp_gain} {rp_calc_str}\n\n"
+                f"⋆⋆⃕　人品值：{total_rp_gain} {rp_calc_str}\n"
+                f"⋆⋆⃕　连续签到：{continuous_days} 天\n"
+                f"⋆⋆⃕　当前总人品：{user['rp']}\n\n"
                 f"❃✦⋆ 签 文 ⋆✦❃\n"
                 f"{fortune}"
                 f"{bonus_msg}\n"
                 f"{divider}"
             )
             yield event.plain_result(reply)
+
 
     async def terminate(self):
         await self._save_data()

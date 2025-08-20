@@ -292,7 +292,7 @@ class DailyCheckinPlugin(Star):
             name = item_name_cn.get(item, "未知")
             # 为特惠商品添加特殊标记和颜色提示
             if price == min_price:
-                shop_items_str.append(f" {icon} {name} - {price} (特惠!)")
+                shop_items_str.append(f"   {icon} {name} - {price} (特惠!)")
             else:
                 shop_items_str.append(f"   {icon} {name} - {price}")
 

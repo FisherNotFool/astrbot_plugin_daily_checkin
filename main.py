@@ -68,32 +68,66 @@ class DailyCheckinPlugin(Star):
     async def daily_check_in(self, event: AstrMessageEvent):
         """每日签到指令，获取人品和可能的彩蛋奖励。"""
         user_id = event.get_sender_id()
+        today_str = datetime.now().strftime("%Y-%m-%d")
 
-        # 1. 确保用户数据结构存在
-        # 使用 async with self.data_lock 确保数据操作的原子性
         async with self.data_lock:
+            # 1. 初始化新用户数据
             if user_id not in self.user_data:
-                # 如果是新用户，则初始化数据
                 initial_attrs = self.config.get("initial_attributes", {})
                 self.user_data[user_id] = {
                     "rp": 0,
-                    "attributes": {
-                        "strength": initial_attrs.get("strength", 1.0),
-                        "agility": initial_attrs.get("agility", 1.0),
-                        "stamina": initial_attrs.get("stamina", 1.0),
-                        "intelligence": initial_attrs.get("intelligence", 1.0),
-                        "charisma": initial_attrs.get("charisma", 1.0)
-                    },
-                    "check_in": {
-                        "continuous_days": 0,
-                        "last_date": "" # 空字符串表示从未签到
-                    }
+                    "attributes": { "strength": initial_attrs.get("strength", 5.0), "agility": initial_attrs.get("agility", 5.0), "stamina": initial_attrs.get("stamina", 5.0), "intelligence": initial_attrs.get("intelligence", 5.0), "charisma": initial_attrs.get("charisma", 5.0) },
+                    "check_in": { "continuous_days": 0, "last_date": "" }
                 }
 
-        # 2. 返回签到结果
-        # （我们将在下一步实现这里的详细逻辑）
-        user_rp = self.user_data[user_id].get("rp", 0)
-        yield event.plain_result(f"这是 Jrrp 指令的占位符。签到功能开发中...\n你当前的 RP 为: {user_rp}")
+            user = self.user_data[user_id]
+
+            # 2. 检查是否已经签到
+            if user["check_in"]["last_date"] == today_str:
+                yield event.plain_result(f"你今天已经签到过了，明天再来吧！\n当前人品: {user['rp']}")
+                return
+
+            # 3. 处理连续签到
+            yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+            if user["check_in"]["last_date"] == yesterday:
+                user["check_in"]["continuous_days"] += 1
+            else:
+                # 断签
+                user["check_in"]["continuous_days"] = 1
+
+            user["check_in"]["last_date"] = today_str
+
+            # 4. 计算人品收益
+            check_in_cfg = self.config.get("check_in_settings", {})
+            base_rp = random.randint(check_in_cfg.get("base_rp_min", 1), check_in_cfg.get("base_rp_max", 100))
+
+            # 计算倍率
+            max_days = check_in_cfg.get("max_continuous_days", 15)
+            bonus_per_day = check_in_cfg.get("bonus_per_day", 0.02)
+            continuous_days = min(user["check_in"]["continuous_days"], max_days)
+            bonus_multiplier = 1 + (continuous_days - 1) * bonus_per_day
+
+            total_rp = round(base_rp * bonus_multiplier)
+            user["rp"] += total_rp
+
+            # 5. 构建回复消息
+            reply_msg = (
+                f"签到成功！\n"
+                f"基础人品: {base_rp}\n"
+                f"连续签到 {user['check_in']['continuous_days']} 天 (加成: x{bonus_multiplier:.2f})\n"
+                f"获得人品: {total_rp}\n"
+                f"当前总人品: {user['rp']}"
+            )
+
+            # 6. 处理彩蛋 (我们将在下一步添加)
+            # ... 彩蛋逻辑 ...
+
+            # 7. 保存数据
+            await self._save_data()
+
+        # 在锁外发送消息
+        yield event.plain_result(reply_msg)
+
 
 
     async def terminate(self):

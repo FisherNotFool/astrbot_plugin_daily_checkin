@@ -299,6 +299,84 @@ class DailyCheckinPlugin(Star):
         yield event.plain_result(reply)
 
 
+    @filter.command("购买", alias={'buy'})
+    async def buy_item(self, event: AstrMessageEvent, item_name: str, quantity: int = 1):
+        """
+        在商店中消耗人品购买属性。
+        使用示例: /购买 力量 5  或  /购买 力量
+        """
+        user_id = event.get_sender_id()
+
+        # --- 1. 输入校验 ---
+        # 属性中文名到内部键名的映射
+        attr_map = {"力量": "strength", "敏捷": "agility", "体力": "stamina", "智力": "intelligence", "魅力": "charisma"}
+        if item_name not in attr_map:
+            yield event.plain_result(f"喵~ 没有名为“{item_name}”的商品呢~ 可以购买的商品有：力量、敏捷、体力、智力、魅力哦~")
+            return
+
+        internal_attr_key = attr_map[item_name]
+
+        if quantity <= 0:
+            yield event.plain_result("购买数量必须是大于0的整数呀~ 请重新输入呢")
+            return
+
+        # --- 2. 懒刷新商店，确保价格最新 ---
+        if self.shop_data.get("last_refresh_date") != date.today().isoformat():
+            await self._refresh_shop()
+
+        # --- 3. 核心购买逻辑与校验（加锁以保证原子性） ---
+        async with self.data_lock:
+            # 检查用户是否存在
+            if user_id not in self.user_data:
+                yield event.plain_result("你还没有签到过哦~ 无法购买商品呢。请先使用 /jrrp 签到吧喵~")
+                return
+
+            user = self.user_data[user_id]
+            shop = self.shop_data
+
+            single_price = shop.get("prices", {}).get(internal_attr_key)
+            if not single_price:
+                 yield event.plain_result("呜... 商店数据好像出了点问题，找不到这个商品的价格呢~")
+                 return
+
+            total_cost = single_price * quantity
+            remaining_purchases = shop.get("remaining_purchases", 0)
+
+            # 多重条件检查
+            if quantity > remaining_purchases:
+                yield event.plain_result(f"抱歉呀~ 你想购买 {quantity} 次，但商店今天只剩下 {remaining_purchases} 次购买机会了呢~")
+                return
+
+            if user['rp'] < total_cost:
+                yield event.plain_result(f"人品不够啦~ 购买需要 {total_cost} 人品，但你现在只有 {user['rp']} 人品呢。再努力攒一攒吧喵~")
+                return
+
+            # --- 4. 执行交易 ---
+            shop['remaining_purchases'] -= quantity
+            user['rp'] -= total_cost
+
+            attribute_increment = self.config.get("shop_settings", {}).get("attribute_increment", 0.1)
+            total_increment = attribute_increment * quantity
+
+            user['attributes'][internal_attr_key] += total_increment
+            # 取一位小数避免精度问题
+            user['attributes'][internal_attr_key] = round(user['attributes'][internal_attr_key], 1)
+
+            new_attribute_value = user['attributes'][internal_attr_key]
+
+        # --- 5. 立即保存数据 ---
+        await self._save_data()
+
+        # --- 6. 发送成功反馈 ---
+        yield event.plain_result(
+            f"\n✨ 购买成功啦！ ✨\n"
+            f"-------------------\n"
+            f"消耗人品：{total_cost}\n"
+            f"剩余人品：{user['rp']}\n"
+            f"当前{item_name}值：{new_attribute_value:.1f}({total_increment:.1f}↑)\n"
+            f"-------------------\n"
+            f"继续加油哦~ (≧∇≦)/"
+        )
 
 
 

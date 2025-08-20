@@ -29,6 +29,7 @@ class DailyCheckinPlugin(Star):
         self.fortunes: Dict = {} # 新增: 用于存储签文
 
         self.data_lock = asyncio.Lock()
+        self.save_task: Optional[asyncio.Task] = None # 用于存放后台保存任务
 
         # [新增] 在初始化时加载 fortunes.json
         try:
@@ -91,6 +92,17 @@ class DailyCheckinPlugin(Star):
             except Exception as e:
                 logger.error(f"保存数据时发生错误: {e}")
 
+
+    async def _periodic_save(self):
+        """后台循环任务，用于定时保存数据。"""
+        interval = self.config.get("system_settings", {}).get("auto_save_interval_seconds", 300)
+        while True:
+            await asyncio.sleep(interval)
+            logger.info(f"开始执行定时保存任务（间隔: {interval}秒）...")
+            await self._save_data()
+            logger.info("定时保存任务完成。")
+
+
     async def _refresh_shop(self):
         """刷新商店的商品价格和购买次数。"""
         async with self.data_lock:
@@ -118,9 +130,16 @@ class DailyCheckinPlugin(Star):
         """
         异步初始化。
         - 加载数据
+        - 启动后台定时保存任务
         """
         await self._load_data()
         logger.info("数据加载完成。")
+
+        # 启动后台定时保存任务
+        self.save_task = asyncio.create_task(self._periodic_save())
+        logger.info("后台定时保存任务已启动。")
+
+        
 
 
 
@@ -381,5 +400,14 @@ class DailyCheckinPlugin(Star):
 
 
     async def terminate(self):
+        """
+        插件卸载/停用时调用。
+        - 取消后台任务
+        - 执行最终的数据保存
+        """
+        if self.save_task:
+            self.save_task.cancel()
+            logger.info("后台定时保存任务已取消。")
+
         await self._save_data()
         logger.info("数据已成功保存。")

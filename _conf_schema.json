@@ -139,5 +139,16 @@
                 "threshold": 0
             }
         ]
+    },
+    "system_settings": {
+        "description": "系统核心设置",
+        "type": "object",
+        "items": {
+            "auto_save_interval_seconds": {
+                "description": "数据自动保存的时间间隔（单位：秒）",
+                "type": "int",
+                "default": 300
+            }
+        }
     }
 }

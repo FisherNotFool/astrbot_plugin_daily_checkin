@@ -192,18 +192,18 @@ class DailyCheckinPlugin(Star):
             # 2. 格式化输出
             divider = "--- ❀ 个人状态 ❀ ---"
             reply = (
-                f"{divider}\n"
+                f"\n{divider}\n"
                 f"💪 力量: {attrs.get('strength', 0):.1f}\n"
                 f"🏃 敏捷: {attrs.get('agility', 0):.1f}\n"
                 f"❤️ 体力: {attrs.get('stamina', 0):.1f}\n"
                 f"🧠 智力: {attrs.get('intelligence', 0):.1f}\n"
                 f"✨ 魅力: {attrs.get('charisma', 0):.1f}\n"
-                f"--------------------\n"
+                f"❀✧⋆✦❃⋆❃✧❀✧❃⋆❃✦⋆✧❀\n"
+                f"🩸 生命值: {derivatives['hp']}\n"
                 f"⚜️ 能级: {energy_val:.2f} ({energy_rank})\n"
                 f"💥 暴击率: {derivatives['crit_rate']:.2%}\n"
                 f"🍃 闪避率: {derivatives['dodge_rate']:.2%}\n"
-                f"❤️‍🩹 生命值: {derivatives['hp']}\n"
-                f"--------------------\n"
+                f"❀✧⋆✦❃⋆❃✧❀✧❃⋆❃✦⋆✧❀\n"
                 f"💰 剩余人品: {user.get('rp', 0)}\n"
                 f"📅 连续签到: {check_in.get('continuous_days', 0)} 天"
             )

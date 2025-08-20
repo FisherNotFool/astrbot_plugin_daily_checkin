@@ -5,7 +5,7 @@ from typing import Dict, Optional
 
 # 1. 使用你提供的正确导入方式
 from astrbot.api.all import *
-
+from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register, StarTools
 
 

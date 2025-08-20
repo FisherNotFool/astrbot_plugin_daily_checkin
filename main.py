@@ -273,7 +273,7 @@ class DailyCheckinPlugin(Star):
             name = item_name_cn.get(item, "未知")
             # 为特惠商品添加特殊标记和颜色提示
             if price == min_price:
-                shop_items_str.append(f"🔥 {icon} {name} - {price} (特惠!)")
+                shop_items_str.append(f" {icon} {name} - {price} (特惠!)")
             else:
                 shop_items_str.append(f"   {icon} {name} - {price}")
 
@@ -288,13 +288,13 @@ class DailyCheckinPlugin(Star):
         
         # 使用不同的分隔线和表情符号增强视觉效果
         reply = (
-            "📦 今日商店 📦\n"
+            "\n📦 今日商店 📦\n"
             "==================\n"
             f"{'\n'.join(shop_items_str)}\n"
             "==================\n"
-            f"🎯 剩余购买次数: {remaining}/{daily_limit}\n"
+            f"🎯 剩余总购买次数: {remaining}/{daily_limit}\n"
             f"😉 你的人品值: {user_rp} {rp_emoji}\n"
-            "💡 提示: 标有🔥的是今日特惠商品哦~"
+            "💡 提示: 先到先得，机不可失失不再来~"
         )
         yield event.plain_result(reply)
 

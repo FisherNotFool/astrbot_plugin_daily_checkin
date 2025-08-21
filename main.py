@@ -19,6 +19,11 @@ from . import utils
 class DailyCheckinPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
+        # [新增] 将初始属性硬编码为类常量
+        self.INITIAL_ATTRIBUTES = {
+            "strength": 1.0, "agility": 1.0, "stamina": 1.0,
+            "intelligence": 1.0, "charisma": 1.0
+        }
         self.config = config
         plugin_data_dir = StarTools.get_data_dir("daily_checkin")
         self.user_data_path = plugin_data_dir / "user_data.json"
@@ -113,7 +118,7 @@ class DailyCheckinPlugin(Star):
             min_price = int(base_price * (1 - fluctuation))
             max_price = int(base_price * (1 + fluctuation))
 
-            attribute_keys = self.config.get("initial_attributes", {}).keys()
+            attribute_keys = self.INITIAL_ATTRIBUTES.keys()
             new_prices = {attr: random.randint(min_price, max_price) for attr in attribute_keys}
 
             self.shop_data = {
@@ -151,11 +156,11 @@ class DailyCheckinPlugin(Star):
 
         async with self.data_lock:
             if user_id not in self.user_data:
-                initial_attrs = self.config.get("initial_attributes", {})
                 self.user_data[user_id] = {
-                    "rp": 0, "attributes": initial_attrs.copy(),
+                    "rp": 0, "attributes": self.INITIAL_ATTRIBUTES.copy(),
                     "check_in": {"continuous_days": 0, "last_date": ""}
                 }
+
 
             user = self.user_data[user_id]
             check_in_info = user["check_in"]

@@ -1,35 +1,4 @@
 {
-    "initial_attributes": {
-        "description": "新用户初始五维属性值",
-        "type": "object",
-        "items": {
-            "strength": {
-                "description": "初始力量",
-                "type": "float",
-                "default": 1.0
-            },
-            "agility": {
-                "description": "初始敏捷",
-                "type": "float",
-                "default": 1.0
-            },
-            "stamina": {
-                "description": "初始体力",
-                "type": "float",
-                "default": 1.0
-            },
-            "intelligence": {
-                "description": "初始智力",
-                "type": "float",
-                "default": 1.0
-            },
-            "charisma": {
-                "description": "初始魅力",
-                "type": "float",
-                "default": 1.0
-            }
-        }
-    },
     "check_in_settings": {
         "description": "签到相关配置",
         "type": "object",

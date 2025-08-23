@@ -90,5 +90,12 @@
             "coefficient": 1.0,
             "upgrade_req": null
         }
+    },
+    "enhancement_k_values": {
+        "凡品": 0.37,
+        "良品": 0.21,
+        "精品": 0.16,
+        "极品": 0.13,
+        "神品": 0.05
     }
 }

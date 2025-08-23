@@ -1,0 +1,94 @@
+{
+    "class_bonus_multipliers": {
+        "均衡使者": {
+            "S": 0.5,
+            "T": 0.5,
+            "A": 0.5,
+            "C": 0.5,
+            "I": 0.5,
+            "ATK%": 0.5,
+            "DEF%": 0.5,
+            "SPD%": 0.5,
+            "CRIT%": 0.5,
+            "CRIT_MUL": 0.5,
+            "HIT%": 0.5,
+            "EVD%": 0.5,
+            "BLK%": 0.5,
+            "BLK_MUL": 0.5,
+            "HP": 0.5
+        },
+        "狂刃战士": {
+            "S": 1.0,
+            "ATK%": 1.0,
+            "A": 0.5,
+            "C": 0.5,
+            "T": 0.3,
+            "I": 0.3,
+            "EVD%": 0.3,
+            "BLK%": 0.3,
+            "SPD%": 0.3,
+            "DEF%": 0.3,
+            "CRIT%": 0.5,
+            "CRIT_MUL": 0.5,
+            "HIT%": 0.5,
+            "BLK_MUL": 0.3,
+            "HP": 0.3
+        },
+        "磐石守卫": {
+            "T": 1.0,
+            "EVD%": 1.0,
+            "BLK%": 1.0,
+            "S": 0.5,
+            "I": 0.5,
+            "A": 0.3,
+            "C": 0.3,
+            "SPD%": 0.3,
+            "ATK%": 0.3,
+            "DEF%": 1.0,
+            "CRIT%": 0.3,
+            "CRIT_MUL": 0.3,
+            "HIT%": 0.5,
+            "BLK_MUL": 1.0,
+            "HP": 1.0
+        },
+        "迅捷术师": {
+            "A": 1.0,
+            "I": 1.0,
+            "SPD%": 1.0,
+            "C": 0.5,
+            "T": 0.5,
+            "S": 0.3,
+            "ATK%": 0.3,
+            "EVD%": 0.3,
+            "BLK%": 0.3,
+            "DEF%": 0.3,
+            "CRIT%": 1.0,
+            "CRIT_MUL": 0.5,
+            "HIT%": 1.0,
+            "BLK_MUL": 0.3,
+            "HP": 0.5
+        }
+    },
+    "grade_info": {
+        "凡品": {
+            "coefficient": 0.1,
+            "upgrade_req": 5
+        },
+        "良品": {
+            "coefficient": 0.2,
+            "upgrade_req": 10
+        },
+        "精品": {
+            "coefficient": 0.3,
+            "upgrade_req": 15
+        },
+        "极品": {
+            "coefficient": 0.4,
+            "upgrade_req": 20
+        },
+        "神品": {
+            "coefficient": 1.0,
+            "upgrade_req": null
+        }
+    }
+}

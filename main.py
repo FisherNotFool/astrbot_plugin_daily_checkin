@@ -31,19 +31,25 @@ class DailyCheckinPlugin(Star):
 
         self.user_data: Dict = {}
         self.shop_data: Dict = {}
-        self.fortunes: Dict = {} # 新增: 用于存储签文
+        self.fortunes: Dict = {} # 存储签文
+        self.game_constants: Dict = {}    # 存储游戏预设
+        self.equipment_presets: Dict = {} # 存储装备预设
 
         self.data_lock = asyncio.Lock()
         self.save_task: Optional[asyncio.Task] = None # 用于存放后台保存任务
 
-        # [新增] 在初始化时加载 fortunes.json
+        # 加载所有静态数据文件
         try:
-            fortunes_path = Path(__file__).parent / "fortunes.json"
-            with open(fortunes_path, 'r', encoding='utf-8') as f:
+            current_dir = Path(__file__).parent
+            with open(current_dir / "fortunes.json", 'r', encoding='utf-8') as f:
                 self.fortunes = json.load(f)
-            logger.info("签文数据加载成功。")
+            with open(current_dir / "game_constants.json", 'r', encoding='utf-8') as f:
+                self.game_constants = json.load(f)
+            with open(current_dir / "equipment_presets.json", 'r', encoding='utf-8') as f:
+                self.equipment_presets = json.load(f)
+            logger.info("所有静态数据 (fortunes, constants, presets) 加载成功。")
         except Exception as e:
-            logger.error(f"加载签文数据 fortunes.json 失败: {e}")
+            logger.error(f"加载静态数据文件时发生错误: {e}")
 
         logger.info("签到插件已加载，配置已读取。")
 

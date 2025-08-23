@@ -403,6 +403,15 @@ class DailyCheckinPlugin(Star):
             f"继续加油哦~ (≧∇≦)/"
         )
 
+    @filter.command("测试")
+    async def test_echo(self, event: AstrMessageEvent, content: str):
+        """
+        [测试指令] 复述用户发送的内容。
+        使用示例: /测试 你好啊
+        """
+        yield event.plain_result(f"返回内容：{content}")
+
+
 
     async def terminate(self):
         """

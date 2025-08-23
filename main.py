@@ -122,26 +122,35 @@ class DailyCheckinPlugin(Star):
 
 
     async def _refresh_shop(self):
-        """刷新商店的商品价格和购买次数。"""
+        """刷新商店的商品价格、购买次数以及抽奖券价格。"""
         async with self.data_lock:
             logger.info("开始每日刷新商店...")
             cfg_shop = self.config.get("shop_settings", {})
+
+            # 刷新属性价格
             base_price = cfg_shop.get("base_price", 50)
             fluctuation = cfg_shop.get("price_fluctuation", 0.5)
             min_price = int(base_price * (1 - fluctuation))
             max_price = int(base_price * (1 + fluctuation))
-
             attribute_keys = self.INITIAL_ATTRIBUTES.keys()
             new_prices = {attr: random.randint(min_price, max_price) for attr in attribute_keys}
+
+            # [新增] 刷新抽奖券价格
+            ticket_base_price = cfg_shop.get("draw_ticket_base_price", 300)
+            min_ticket_price = int(ticket_base_price * (1 - fluctuation))
+            max_ticket_price = int(ticket_base_price * (1 + fluctuation))
+            new_ticket_price = random.randint(min_ticket_price, max_ticket_price)
 
             self.shop_data = {
                 "last_refresh_date": date.today().isoformat(),
                 "remaining_purchases": cfg_shop.get("daily_purchase_limit", 10),
-                "prices": new_prices
+                "prices": new_prices,
+                "draw_ticket_price": new_ticket_price
             }
         # 刷新是一个重要事件，立即保存一次数据
         await self._save_data()
-        logger.info(f"商店刷新完成, 新价格: {new_prices}")
+        logger.info(f"商店刷新完成, 新价格: {new_prices}, 抽奖券价格: {new_ticket_price}")
+
 
 
     async def initialize(self):
@@ -180,7 +189,7 @@ class DailyCheckinPlugin(Star):
                     "equipment_sets": {class_name: {} for class_name in class_names}
                 }
                 # 提示新用户设置昵称
-                yield event.plain_result("欢迎新朋友喵！已为你创建角色喵~请使用 /设置昵称 [你的昵称] 来完成注册哦喵！=￣ω￣=")
+                yield event.plain_result("欢迎新朋友喵！已为你创建角色喵~请使用 `/设置昵称 [你的昵称]` 来完成注册哦喵！=￣ω￣=")
 
 
             user = self.user_data[user_id]
@@ -207,13 +216,19 @@ class DailyCheckinPlugin(Star):
             user["rp"] += total_rp_gain
 
             bonus_msg = ""
+            ticket_bonus_msg = ""
             attributes_to_update = []
             attribute_list = list(user["attributes"].keys())
+            
             if base_rp == 100: attributes_to_update = random.sample(attribute_list, k=min(len(attribute_list), 5))
             elif base_rp in [1, 50]: attributes_to_update = random.sample(attribute_list, k=min(len(attribute_list), 2))
             elif base_rp in [33, 66, 88, 99]: attributes_to_update = random.sample(attribute_list, k=min(len(attribute_list), 1))
 
             if attributes_to_update:
+                # 增加抽奖券
+                user['resources']['draw_tickets'] += 1
+                ticket_bonus_msg = "\n🎟️意外之喜！获得【抽奖券x1】"
+                
                 attribute_increment = self.config.get("shop_settings", {}).get("attribute_increment", 0.1)
                 bonus_parts = []
                 for attr in attributes_to_update:
@@ -240,8 +255,10 @@ class DailyCheckinPlugin(Star):
                 f"❃✦⋆ 签 文 ⋆✦❃\n"
                 f"{fortune}"
                 f"{bonus_msg}\n"
+                f"{ticket_bonus_msg}\n"
                 f"{divider}"
             )
+            await self._save_data()     #立即保存一次数据
             yield event.plain_result(reply)
 
     @filter.command("设置昵称", alias={'set_nickname'})
@@ -292,14 +309,14 @@ class DailyCheckinPlugin(Star):
 
             current_class = self.user_data[user_id].get('active_class')
             if current_class == target_class:
-                yield event.plain_result(f"你当前职业已经是 {target_class} 了，无需切换喵！(○｀ 3′○)")
+                yield event.plain_result(f"你当前职业已经是【{target_class}】了，无需切换喵！(○｀ 3′○)")
                 return
 
             # 更新激活职业
             self.user_data[user_id]['active_class'] = target_class
 
         await self._save_data() # 立即保存重要变更
-        yield event.plain_result(f"职业切换成功喵！当前职业： {target_class} ！")
+        yield event.plain_result(f"职业切换成功喵！当前职业：【{target_class}】！")
 
 
 
@@ -310,7 +327,7 @@ class DailyCheckinPlugin(Star):
 
         async with self.data_lock:
             if user_id not in self.user_data:
-                yield event.plain_result("你还没有签到过，没有状态信息哦。请先使用 /jrrp 进行签到。")
+                yield event.plain_result("你还没有角色哦，请先使用 /jrrp 签到创建角色喵！")
                 return
 
             user = self.user_data[user_id]
@@ -405,38 +422,50 @@ class DailyCheckinPlugin(Star):
 
     @filter.command("购买", alias={'buy'})
     async def buy_item(self, event: AstrMessageEvent, item_name: str, quantity: int = 1):
-        """
-        在商店中消耗人品购买属性。
-        使用示例: /购买 力量 5  或  /购买 力量
-        """
+        """在商店中消耗人品购买属性或抽奖券。"""
         user_id = event.get_sender_id()
-
-        # --- 1. 输入校验 ---
-        # 属性中文名到内部键名的映射
-        attr_map = {"力量": "strength", "敏捷": "agility", "体力": "stamina", "智力": "intelligence", "魅力": "charisma"}
-        if item_name not in attr_map:
-            yield event.plain_result(f"喵~ 没有名为“{item_name}”的商品呢~ 可以购买的商品有：力量、敏捷、体力、智力、魅力哦~")
-            return
-
-        internal_attr_key = attr_map[item_name]
 
         if quantity <= 0:
             yield event.plain_result("购买数量必须是大于0的整数呀~ 请重新输入呢")
             return
 
-        # --- 2. 懒刷新商店，确保价格最新 ---
         if self.shop_data.get("last_refresh_date") != date.today().isoformat():
             await self._refresh_shop()
 
-        # --- 3. 核心购买逻辑与校验（加锁以保证原子性） ---
         async with self.data_lock:
-            # 检查用户是否存在
             if user_id not in self.user_data:
-                yield event.plain_result("你还没有签到过哦~ 无法购买商品呢。请先使用 /jrrp 签到吧喵~")
+                yield event.plain_result("你还没有签到过哦~ 无法购买。请先 /jrrp 签到吧喵~")
                 return
 
             user = self.user_data[user_id]
             shop = self.shop_data
+
+            # --- 购买抽奖券 ---
+            if item_name in ["抽奖券", "ticket"]:
+                ticket_price = shop.get("draw_ticket_price", 300)
+                total_cost = ticket_price * quantity
+                if user['rp'] < total_cost:
+                    yield event.plain_result(f"人品不够啦~ 购买{quantity}张抽奖券需要 {total_cost} 人品，但你只有 {user['rp']} 人品喵。继续努力吧(ง •_•)ง")
+                    return
+                user['rp'] -= total_cost
+                user['resources']['draw_tickets'] += quantity
+                await self._save_data()
+                yield event.plain_result(
+                    f"\n✨ 购买成功啦！ ✨\n"
+                    f"-------------------\n"
+                    f"消耗人品：{total_cost}\n"
+                    f"剩余人品：{user['rp']}\n"
+                    f"当前抽奖券：{user['resources']['draw_tickets']}({quantity}↑)\n"
+                    f"-------------------\n"
+                    f"继续加油喵~ (≧∇≦)/")
+                return
+
+            # --- 购买属性 ---
+            attr_map = {"力量": "strength", "敏捷": "agility", "体力": "stamina", "智力": "intelligence", "魅力": "charisma"}
+            internal_attr_key = attr_map.get(item_name)
+            if not internal_attr_key:
+                yield event.plain_result(f"喵~ 没有名为“{item_name}”的商品呢~ 可以购买的商品有：力量、敏捷、体力、智力、魅力、抽奖券哦~")
+                return
 
             single_price = shop.get("prices", {}).get(internal_attr_key)
             if not single_price:
@@ -446,44 +475,123 @@ class DailyCheckinPlugin(Star):
             total_cost = single_price * quantity
             remaining_purchases = shop.get("remaining_purchases", 0)
 
-            # 多重条件检查
             if quantity > remaining_purchases:
                 yield event.plain_result(f"抱歉呀~ 你想购买 {quantity} 次，但商店今天只剩下 {remaining_purchases} 次购买机会了呢~")
                 return
-
             if user['rp'] < total_cost:
-                yield event.plain_result(f"人品不够啦~ 购买需要 {total_cost} 人品，但你现在只有 {user['rp']} 人品呢。再努力攒一攒吧喵~")
+                yield event.plain_result(f"人品不够啦~ 购买需要 {total_cost} 人品，但你现在只有 {user['rp']} 人品呢。继续努力吧(ง •_•)ง")
                 return
 
-            # --- 4. 执行交易 ---
             shop['remaining_purchases'] -= quantity
             user['rp'] -= total_cost
-
             attribute_increment = self.config.get("shop_settings", {}).get("attribute_increment", 0.1)
             total_increment = attribute_increment * quantity
-
-            user['attributes'][internal_attr_key] += total_increment
-            # 取一位小数避免精度问题
-            user['attributes'][internal_attr_key] = round(user['attributes'][internal_attr_key], 1)
-
+            user['attributes'][internal_attr_key] = round(user['attributes'][internal_attr_key] + total_increment, 1)
             new_attribute_value = user['attributes'][internal_attr_key]
 
-        # --- 5. 立即保存数据 ---
+            # --- [输出格式] ---
+            await self._save_data()
+            yield event.plain_result(
+                f"\n✨ 购买成功啦！ ✨\n"
+                f"-------------------\n"
+                f"消耗人品：{total_cost}\n"
+                f"剩余人品：{user['rp']}\n"
+                f"当前{item_name}值：{new_attribute_value:.1f}({total_increment:.1f}↑)\n"
+                f"剩余属性总购买次数：{shop['remaining_purchases']}次\n"
+                f"-------------------\n"
+                f"继续加油喵~ (≧∇≦)/"
+            )
+
+
+    @filter.command("抽奖", alias={'draw'})
+    async def draw_lottery(self, event: AstrMessageEvent, quantity: int = 1):
+        """消耗抽奖券进行抽奖，支持批量。"""
+        user_id = event.get_sender_id()
+        if quantity <= 0:
+            yield event.plain_result("抽奖次数必须是大于0的整数哦~")
+            return
+
+        async with self.data_lock:
+            if user_id not in self.user_data:
+                yield event.plain_result("你还没有角色呢，请先使用 /jrrp 创建角色喵！")
+                return
+
+            user = self.user_data[user_id]
+
+            if user['resources']['draw_tickets'] < quantity:
+                yield event.plain_result(f"你的抽奖券不足喵！想抽 {quantity} 次，但只有 {user['resources']['draw_tickets']} 张。快去商店购买喵ヾ(≧▽≦*)o")
+                return
+
+            user['resources']['draw_tickets'] -= quantity
+
+            # [核心修正] 初始化 results 字典，用于存放所有类型的奖励
+            results = {
+                "rp": 0,
+                "stone": 0,
+                "equipment": [], # 使用列表存放获得的装备名
+                "attribute_bonus": [] # 使用列表存放获得的属性点
+            }
+
+            for _ in range(quantity):
+                # 抽奖逻辑 (保持不变)
+                pool = [(("equipment",), 0.1), (("rp", 50, 200), 0.5), (("stone", 1, 1), 0.2), (("stone", 2, 2), 0.15), (("stone", 3, 3), 0.05)]
+                rewards, weights = zip(*pool)
+                chosen_reward = random.choices(rewards, weights=weights, k=1)[0]
+                reward_type = chosen_reward[0]
+
+                # 根据奖励类型发放奖励
+                if reward_type == "rp":
+                    rp_gain = random.randint(chosen_reward[1], chosen_reward[2])
+                    user['rp'] += rp_gain
+                    results['rp'] += rp_gain
+
+                elif reward_type == "stone":
+                    stone_gain = chosen_reward[1]
+                    user['resources']['enhancement_stones'] += stone_gain
+                    results['stone'] += stone_gain
+
+                elif reward_type == "equipment":
+                    # [核心修正] 将装备获取结果存入 results 字典，而不是临时变量
+                    all_possible_items = [(cls, slt) for cls, slts in self.equipment_presets.items() for slt in slts.keys()]
+                    user_owned_items = set((cls, slt) for cls, slts in user.get("equipment_sets", {}).items() for slt in slts.keys())
+                    unowned_items = [item for item in all_possible_items if item not in user_owned_items]
+
+                    if not unowned_items:
+                        attr_keys = list(self.INITIAL_ATTRIBUTES.keys())
+                        chosen_attr = random.choice(attr_keys)
+                        user['attributes'][chosen_attr] = round(user['attributes'][chosen_attr] + 0.5, 1)
+                        results['attribute_bonus'].append(f"⭐ 随机属性点: {chosen_attr.capitalize()} +0.5")
+                    else:
+                        active_class = user.get("active_class", "均衡使者")
+                        preferred_unowned = [item for item in unowned_items if item[0] == active_class]
+                        target_pool = preferred_unowned if random.random() < 0.5 and preferred_unowned else unowned_items
+                        chosen_class, chosen_slot = random.choice(target_pool)
+                        user['equipment_sets'][chosen_class][chosen_slot] = {"grade": "凡品", "success_count": 0}
+                        item_name = self.equipment_presets[chosen_class][chosen_slot]["names"]["凡品"]
+                        results['equipment'].append(f"🎊 【{item_name}】({chosen_class})")
+
+            # --- [核心修正] 构建能展示所有奖励的最终报告 ---
+            summary_lines = [f"--- 抽奖 {quantity} 次 报告 ---"]
+            if results['rp'] > 0:
+                summary_lines.append(f"💰 人品 +{results['rp']}")
+            if results['stone'] > 0:
+                summary_lines.append(f"💎 强化石 +{results['stone']}")
+            if results['equipment']:
+                summary_lines.extend(results['equipment'])
+            if results['attribute_bonus']:
+                summary_lines.extend(results['attribute_bonus'])
+
+            if not any([results['rp'], results['stone'], results['equipment'], results['attribute_bonus']]):
+                 summary_lines.append("💨 好像什么都没抽到...下次一定！")
+
+            summary_lines.append("--------------------")
+            summary_lines.append(f"剩余抽奖券: {user['resources']['draw_tickets']}")
+            reply_msg = "\n".join(summary_lines)
+
         await self._save_data()
+        yield event.plain_result(reply_msg)
 
-        # --- 6. 发送成功反馈 ---
-        yield event.plain_result(
-            f"\n✨ 购买成功啦！ ✨\n"
-            f"-------------------\n"
-            f"消耗人品：{total_cost}\n"
-            f"剩余人品：{user['rp']}\n"
-            f"当前{item_name}值：{new_attribute_value:.1f}({total_increment:.1f}↑)\n"
-            f"剩余总购买次数：{shop['remaining_purchases']}次\n"
-            f"-------------------\n"
-            f"继续加油哦~ (≧∇≦)/"
-        )
 
-    
 
 
     async def terminate(self):

@@ -44,6 +44,11 @@
                 "type": "int",
                 "default": 10
             },
+            "draw_ticket_base_price": {
+                "description": "抽奖券的基础价格",
+                "type": "int",
+                "default": 300
+            },
             "attribute_increment": {
                 "description": "每次购买增加的属性点数",
                 "type": "float",

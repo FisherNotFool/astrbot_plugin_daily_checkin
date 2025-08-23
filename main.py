@@ -434,75 +434,77 @@ class DailyCheckinPlugin(Star):
         if self.shop_data.get("last_refresh_date") != date.today().isoformat():
             await self._refresh_shop()
 
+        # [核心修正] 把所有 yield 和 return 的逻辑先放在 async with 块外面处理
+        reply_message = None
+
         async with self.data_lock:
             if user_id not in self.user_data:
-                yield event.plain_result("你还没有签到过哦~ 无法购买。请先 /jrrp 签到吧喵~")
-                return
+                reply_message = "你还没有签到过哦~ 无法购买。请先 /jrrp 签到吧喵~"
+            else:
+                user = self.user_data[user_id]
+                shop = self.shop_data
 
-            user = self.user_data[user_id]
-            shop = self.shop_data
+                # --- 购买抽奖券 ---
+                if item_name in ["抽奖券", "ticket"]:
+                    ticket_price = shop.get("draw_ticket_price", 300)
+                    total_cost = ticket_price * quantity
+                    if user['rp'] < total_cost:
+                        reply_message = f"人品不够啦~ 购买{quantity}张抽奖券需要 {total_cost} 人品，但你只有 {user['rp']} 人品喵。继续努力吧(ง •_•)ง"
+                    else:
+                        user['rp'] -= total_cost
+                        user['resources']['draw_tickets'] += quantity
+                        reply_message = (
+                            f"\n✨ 购买成功啦！ ✨\n"
+                            f"-------------------\n"
+                            f"消耗人品：{total_cost}\n"
+                            f"剩余人品：{user['rp']}\n"
+                            f"当前抽奖券：{user['resources']['draw_tickets']}({quantity}↑)\n"
+                            f"-------------------\n"
+                            f"继续加油喵~ (≧∇≦)/"
+                        )
 
-            # --- 购买抽奖券 ---
-            if item_name in ["抽奖券", "ticket"]:
-                ticket_price = shop.get("draw_ticket_price", 300)
-                total_cost = ticket_price * quantity
-                if user['rp'] < total_cost:
-                    yield event.plain_result(f"人品不够啦~ 购买{quantity}张抽奖券需要 {total_cost} 人品，但你只有 {user['rp']} 人品喵。继续努力吧(ง •_•)ง")
-                    return
-                user['rp'] -= total_cost
-                user['resources']['draw_tickets'] += quantity
-                await self._save_data()
-                yield event.plain_result(
-                    f"\n✨ 购买成功啦！ ✨\n"
-                    f"-------------------\n"
-                    f"消耗人品：{total_cost}\n"
-                    f"剩余人品：{user['rp']}\n"
-                    f"当前抽奖券：{user['resources']['draw_tickets']}({quantity}↑)\n"
-                    f"-------------------\n"
-                    f"继续加油喵~ (≧∇≦)/")
-                return
+                # --- 购买属性 ---
+                else:
+                    attr_map = {"力量": "strength", "敏捷": "agility", "体力": "stamina", "智力": "intelligence", "魅力": "charisma"}
+                    internal_attr_key = attr_map.get(item_name)
+                    if not internal_attr_key:
+                        reply_message = f"喵~ 没有名为“{item_name}”的商品呢~ 可以购买的商品有：力量、敏捷、体力、智力、魅力、抽奖券哦~"
+                    else:
+                        single_price = shop.get("prices", {}).get(internal_attr_key)
+                        if not single_price:
+                            reply_message = "呜... 商店数据好像出了点问题，找不到这个商品的价格呢~"
+                        else:
+                            total_cost = single_price * quantity
+                            remaining_purchases = shop.get("remaining_purchases", 0)
 
-            # --- 购买属性 ---
-            attr_map = {"力量": "strength", "敏捷": "agility", "体力": "stamina", "智力": "intelligence", "魅力": "charisma"}
-            internal_attr_key = attr_map.get(item_name)
-            if not internal_attr_key:
-                yield event.plain_result(f"喵~ 没有名为“{item_name}”的商品呢~ 可以购买的商品有：力量、敏捷、体力、智力、魅力、抽奖券哦~")
-                return
+                            if quantity > remaining_purchases:
+                                reply_message = f"抱歉呀~ 你想购买 {quantity} 次，但商店今天只剩下 {remaining_purchases} 次购买机会了呢~"
+                            elif user['rp'] < total_cost:
+                                reply_message = f"人品不够啦~ 购买需要 {total_cost} 人品，但你现在只有 {user['rp']} 人品呢。继续努力吧(ง •_•)ง"
+                            else:
+                                shop['remaining_purchases'] -= quantity
+                                user['rp'] -= total_cost
+                                attribute_increment = self.config.get("shop_settings", {}).get("attribute_increment", 0.1)
+                                total_increment = attribute_increment * quantity
+                                user['attributes'][internal_attr_key] = round(user['attributes'][internal_attr_key] + total_increment, 1)
+                                new_attribute_value = user['attributes'][internal_attr_key]
+                                reply_message = (
+                                    f"\n✨ 购买成功啦！ ✨\n"
+                                    f"-------------------\n"
+                                    f"消耗人品：{total_cost}\n"
+                                    f"剩余人品：{user['rp']}\n"
+                                    f"当前{item_name}值：{new_attribute_value:.1f}({total_increment:.1f}↑)\n"
+                                    f"剩余属性总购买次数：{shop['remaining_purchases']}次\n"
+                                    f"-------------------\n"
+                                    f"继续加油喵~ (≧∇≦)/"
+                                )
+        # 在 async with self.data_lock 块结束后，锁已经被释放了
+        # 在这里调用 _save_data 是安全的
+        await self._save_data()
 
-            single_price = shop.get("prices", {}).get(internal_attr_key)
-            if not single_price:
-                 yield event.plain_result("呜... 商店数据好像出了点问题，找不到这个商品的价格呢~")
-                 return
+        if reply_message:
+            yield event.plain_result(reply_message.strip())
 
-            total_cost = single_price * quantity
-            remaining_purchases = shop.get("remaining_purchases", 0)
-
-            if quantity > remaining_purchases:
-                yield event.plain_result(f"抱歉呀~ 你想购买 {quantity} 次，但商店今天只剩下 {remaining_purchases} 次购买机会了呢~")
-                return
-            if user['rp'] < total_cost:
-                yield event.plain_result(f"人品不够啦~ 购买需要 {total_cost} 人品，但你现在只有 {user['rp']} 人品呢。继续努力吧(ง •_•)ง")
-                return
-
-            shop['remaining_purchases'] -= quantity
-            user['rp'] -= total_cost
-            attribute_increment = self.config.get("shop_settings", {}).get("attribute_increment", 0.1)
-            total_increment = attribute_increment * quantity
-            user['attributes'][internal_attr_key] = round(user['attributes'][internal_attr_key] + total_increment, 1)
-            new_attribute_value = user['attributes'][internal_attr_key]
-
-            # --- [输出格式] ---
-            await self._save_data()
-            yield event.plain_result(
-                f"\n✨ 购买成功啦！ ✨\n"
-                f"-------------------\n"
-                f"消耗人品：{total_cost}\n"
-                f"剩余人品：{user['rp']}\n"
-                f"当前{item_name}值：{new_attribute_value:.1f}({total_increment:.1f}↑)\n"
-                f"剩余属性总购买次数：{shop['remaining_purchases']}次\n"
-                f"-------------------\n"
-                f"继续加油喵~ (≧∇≦)/"
-            )
 
 
     @filter.command("抽奖", alias={'draw'})

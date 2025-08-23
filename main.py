@@ -19,10 +19,17 @@ from . import utils
 class DailyCheckinPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
-        # [新增] 将初始属性硬编码为类常量
+        # 将初始属性硬编码为类常量
         self.INITIAL_ATTRIBUTES = {
             "strength": 1.0, "agility": 1.0, "stamina": 1.0,
             "intelligence": 1.0, "charisma": 1.0
+        }
+        # 定义职业映射
+        self.CLASS_MAP = {
+            "1": "均衡使者", "均衡使者": "均衡使者",
+            "2": "狂刃战士", "狂刃战士": "狂刃战士",
+            "3": "磐石守卫", "磐石守卫": "磐石守卫",
+            "4": "迅捷术师", "迅捷术师": "迅捷术师"
         }
         self.config = config
         plugin_data_dir = StarTools.get_data_dir("daily_checkin")
@@ -162,10 +169,18 @@ class DailyCheckinPlugin(Star):
 
         async with self.data_lock:
             if user_id not in self.user_data:
+                class_names = self.game_constants.get("class_bonus_multipliers", {}).keys()
                 self.user_data[user_id] = {
-                    "rp": 0, "attributes": self.INITIAL_ATTRIBUTES.copy(),
-                    "check_in": {"continuous_days": 0, "last_date": ""}
+                    "nickname": None,
+                    "rp": 0,
+                    "resources": {"enhancement_stones": 0, "draw_tickets": 0},
+                    "attributes": self.INITIAL_ATTRIBUTES.copy(),
+                    "check_in": {"continuous_days": 0, "last_date": ""},
+                    "active_class": "均衡使者",
+                    "equipment_sets": {class_name: {} for class_name in class_names}
                 }
+                # 提示新用户设置昵称
+                yield event.plain_result("欢迎新朋友喵！已为你创建角色喵~请使用 /设置昵称 [你的昵称] 来完成注册哦喵！=￣ω￣=")
 
 
             user = self.user_data[user_id]
@@ -228,6 +243,65 @@ class DailyCheckinPlugin(Star):
                 f"{divider}"
             )
             yield event.plain_result(reply)
+
+    @filter.command("设置昵称", alias={'set_nickname'})
+    async def set_nickname(self, event: AstrMessageEvent, nickname: str):
+        """设置用户在机器人中的唯一昵称。"""
+        user_id = event.get_sender_id()
+
+        async with self.data_lock:
+            if user_id not in self.user_data:
+                yield event.plain_result("你还没有角色哦，请先使用 /jrrp 签到创建角色喵！")
+                return
+
+            # 检查昵称唯一性
+            for uid, udata in self.user_data.items():
+                if udata.get("nickname") == nickname and uid != user_id:
+                    yield event.plain_result(f"抱歉喵＞﹏＜，昵称 “{nickname}” 已经被其他玩家占用了，换一个吧！")
+                    return
+
+            # 更新昵称
+            self.user_data[user_id]['nickname'] = nickname
+
+        await self._save_data() # 立即保存重要变更
+        yield event.plain_result(f"昵称设置成功！你现在是 “{nickname}” 啦！")
+
+
+    @filter.command("切换职业", alias={'set_class'})
+    async def set_class(self, event: AstrMessageEvent, class_identifier: str):
+        """切换当前激活的职业。"""
+        user_id = event.get_sender_id()
+
+        # 解析输入的职业标识符
+        target_class = self.CLASS_MAP.get(class_identifier)
+
+        if not target_class:
+            yield event.plain_result(
+                "无效的职业喵！(￣ε(#￣) 请输入职业全名或对应数字：\n"
+                "1. 均衡使者\n"
+                "2. 狂刃战士\n"
+                "3. 磐石守卫\n"
+                "4. 迅捷术师"
+            )
+            return
+
+        async with self.data_lock:
+            if user_id not in self.user_data:
+                yield event.plain_result("你还没有角色哦，请先使用 /jrrp 签到创建角色喵！")
+                return
+
+            current_class = self.user_data[user_id].get('active_class')
+            if current_class == target_class:
+                yield event.plain_result(f"你当前职业已经是 {target_class} 了，无需切换喵！(○｀ 3′○)")
+                return
+
+            # 更新激活职业
+            self.user_data[user_id]['active_class'] = target_class
+
+        await self._save_data() # 立即保存重要变更
+        yield event.plain_result(f"职业切换成功喵！当前职业： {target_class} ！")
+
+
 
     @filter.command("状态", alias={'我的状态', 'status'})
     async def show_status(self, event: AstrMessageEvent):

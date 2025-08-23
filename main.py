@@ -413,7 +413,7 @@ class DailyCheckinPlugin(Star):
             "\n📦 今日商店 📦\n"
             "==================\n"
             f"{'\n'.join(shop_items_str)}\n"
-            f"{'\n'.join(f"   🎟️ 抽奖券 - {draw_ticket_price}")}\n"
+            f"   🎟️ 抽奖券 - {draw_ticket_price}\n"
             "==================\n"
             f"🎯 剩余属性总购买次数: {remaining}/{daily_limit}\n"
             f"😉 你的人品值: {user_rp} {rp_emoji}\n"

@@ -503,7 +503,7 @@ class DailyCheckinPlugin(Star):
         await self._save_data()
 
         if reply_message:
-            yield event.plain_result(reply_message.strip())
+            yield event.plain_result(reply_message)
 
 
 

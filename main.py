@@ -369,6 +369,7 @@ class DailyCheckinPlugin(Star):
 
         user_id = event.get_sender_id()
         prices = self.shop_data.get("prices", {})
+        draw_ticket_price = self.shop_data.get("draw_ticket_price", 300)
 
         # 找到最低价，用于高亮
         min_price = min(prices.values()) if prices else 0
@@ -412,8 +413,9 @@ class DailyCheckinPlugin(Star):
             "\n📦 今日商店 📦\n"
             "==================\n"
             f"{'\n'.join(shop_items_str)}\n"
+            f"{'\n'.join(f"   🎟️ 抽奖券 - {draw_ticket_price}")}\n"
             "==================\n"
-            f"🎯 剩余总购买次数: {remaining}/{daily_limit}\n"
+            f"🎯 剩余属性总购买次数: {remaining}/{daily_limit}\n"
             f"😉 你的人品值: {user_rp} {rp_emoji}\n"
             "💡 提示: 先到先得，机不可失失不再来~"
         )

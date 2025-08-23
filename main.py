@@ -458,7 +458,7 @@ class DailyCheckinPlugin(Star):
                             f"-------------------\n"
                             f"消耗人品：{total_cost}\n"
                             f"剩余人品：{user['rp']}\n"
-                            f"当前抽奖券：{user['resources']['draw_tickets']}({quantity}↑)\n"
+                            f"当前抽奖券：{user['resources']['draw_tickets']} ({quantity}↑)\n"
                             f"-------------------\n"
                             f"继续加油喵~ (≧∇≦)/"
                         )
@@ -493,7 +493,7 @@ class DailyCheckinPlugin(Star):
                                     f"-------------------\n"
                                     f"消耗人品：{total_cost}\n"
                                     f"剩余人品：{user['rp']}\n"
-                                    f"当前{item_name}值：{new_attribute_value:.1f}({total_increment:.1f}↑)\n"
+                                    f"当前{item_name}值：{new_attribute_value:.1f} ({total_increment:.1f}↑)\n"
                                     f"剩余属性总购买次数：{shop['remaining_purchases']}次\n"
                                     f"-------------------\n"
                                     f"继续加油喵~ (≧∇≦)/"
@@ -575,11 +575,11 @@ class DailyCheckinPlugin(Star):
                         results['equipment'].append(f"🎊 【{item_name}】({chosen_class})")
 
             # --- [核心修正] 构建能展示所有奖励的最终报告 ---
-            summary_lines = [f"--- 抽奖 {quantity} 次 报告 ---"]
+            summary_lines = [f"\n--- 抽奖 {quantity} 次 报告 ---"]
             if results['rp'] > 0:
-                summary_lines.append(f"💰 人品 +{results['rp']}")
+                summary_lines.append(f"💰 人品 + {results['rp']}")
             if results['stone'] > 0:
-                summary_lines.append(f"💎 强化石 +{results['stone']}")
+                summary_lines.append(f"💎 强化石 + {results['stone']}")
             if results['equipment']:
                 summary_lines.extend(results['equipment'])
             if results['attribute_bonus']:
@@ -589,7 +589,9 @@ class DailyCheckinPlugin(Star):
                  summary_lines.append("💨 好像什么都没抽到...下次一定！")
 
             summary_lines.append("--------------------")
-            summary_lines.append(f"剩余抽奖券: {user['resources']['draw_tickets']}")
+            summary_lines.append(f"剩余抽奖券 🎟️: {user['resources']['draw_tickets']} ({quantity} ↓)")
+            summary_lines.append(f"当前强化石 💎: {user['resources']['enhancement_stones']} ({results['stone']} ↑)")
+            summary_lines.append(f"当前人品值 💰: {user['rp']} ({results['rp']} ↑)")
             reply_msg = "\n".join(summary_lines)
 
         await self._save_data()

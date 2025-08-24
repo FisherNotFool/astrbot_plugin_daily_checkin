@@ -793,6 +793,30 @@ class DailyCheckinPlugin(Star):
             # 4. 发送战报
             yield event.plain_result(battle_log)
 
+    @filter.command("显示昵称", alias={'昵称列表'})
+    async def show_all_nicknames(self, event: AstrMessageEvent):
+        """显示所有已设置昵称的玩家列表。"""
+        nicknames = []
+        async with self.data_lock:
+            # 遍历所有用户数据，收集已设置的昵称
+            for user in self.user_data.values():
+                nickname = user.get("nickname")
+                if nickname: # 确保昵称不为None或空字符串
+                    nicknames.append(nickname)
+
+        if not nicknames:
+            yield event.plain_result("目前还没有玩家设置昵称哦~")
+            return
+
+        # 格式化输出
+        title = "--- 📝 玩家昵称列表 📝 ---"
+        # 使用 enumerate 创建带编号的列表
+        formatted_list = [f"{i+1}. {name}" for i, name in enumerate(nicknames)]
+
+        reply_message = f"{title}\n" + "\n".join(formatted_list)
+
+        yield event.plain_result(reply_message)
+
 
     @filter.command("test")
     async def test_set_rp(self, event: AstrMessageEvent, amount: int):

@@ -12,7 +12,7 @@ from astrbot.api import AstrBotConfig
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register, StarTools
 from astrbot.api import logger # 使用 astrbot 提供的 logger 接口
-from . import utils
+from . import utils, battle
 
 
 @register("daily_checkin", "FoolFish", "一个QQ群签到成长系统", "1.0.0")
@@ -750,6 +750,49 @@ class DailyCheckinPlugin(Star):
 
         await self._save_data()
         yield event.plain_result(reply_msg)
+
+    @filter.command("PVP", alias={'挑战'})
+    async def pvp_challenge(self, event: AstrMessageEvent, target_nickname: str):
+        """向指定昵称的玩家发起挑战。"""
+        challenger_id = event.get_sender_id()
+
+        async with self.data_lock:
+            # 1. 查找挑战者和被挑战者
+            challenger_data = self.user_data.get(challenger_id)
+            if not challenger_data or not challenger_data.get("nickname"):
+                yield event.plain_result("你还没有设置昵称喵！请先使用 `/设置昵称` 来打响你的名号！")
+                return
+
+            challenger_nickname = challenger_data["nickname"]
+            if challenger_nickname == target_nickname:
+                yield event.plain_result("不能挑战自己哦喵！")
+                return
+
+            defender_id = None
+            defender_data = None
+            for uid, udata in self.user_data.items():
+                if udata.get("nickname") == target_nickname:
+                    defender_id = uid
+                    defender_data = udata
+                    break
+
+            if not defender_data:
+                yield event.plain_result(f"找不到名为 “{target_nickname}” 的玩家，是不是打错了喵？")
+                return
+
+            # 2. 为双方生成战斗属性
+            challenger_stats = utils.get_detailed_player_stats(challenger_data, self.equipment_presets, self.game_constants, self.config)
+            challenger_stats['name'] = challenger_nickname # 添加名字用于日志
+
+            defender_stats = utils.get_detailed_player_stats(defender_data, self.equipment_presets, self.game_constants, self.config)
+            defender_stats['name'] = target_nickname
+
+            # 3. 调用战斗模拟器
+            winner_name, battle_log = battle.simulate_battle(challenger_stats, defender_stats)
+
+            # 4. 发送战报
+            yield event.plain_result(battle_log)
+
 
     @filter.command("test")
     async def test_set_rp(self, event: AstrMessageEvent, amount: int):

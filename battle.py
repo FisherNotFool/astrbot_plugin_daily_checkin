@@ -10,7 +10,7 @@ def simulate_battle(p1_stats: Dict, p2_stats: Dict) -> Tuple[str, str]:
     此函数是PVP和未来PVE的核心，完全兼容。
     """
     # --- 初始化战斗 ---
-    log = ["\n❀✧⋆✦⋆❃✧ ⚔️ 战斗开始 ⚔️ ✧❃⋆✦⋆✧❀"]
+    log = ["\n❀✧⋆✦ ⚔️ 战斗开始 ⚔️ ✦⋆✧❀"]
     p1_hp = p1_stats['HP']['final']
     p2_hp = p2_stats['HP']['final']
 
@@ -69,11 +69,11 @@ def simulate_battle(p1_stats: Dict, p2_stats: Dict) -> Tuple[str, str]:
 
         # 步骤7: 追加回合判定 (最大追加2次)
         if extra_turn_count < 2:
-            base_add_rate = min((attacker['SPD']['final'] / (attacker['SPD']['final'] + defender['SPD']['final'])) * 0.5, 0.5)
+            base_add_rate = min((attacker['SPD']['final'] / (attacker['SPD']['final'] + defender['SPD']['final'])) * 0.25, 0.5)
             current_add_rate = base_add_rate * (0.5 ** extra_turn_count)
             if random.random() <= current_add_rate:
                 extra_turn_count += 1
-                log.append(f"⚡ 【{attacker['name']}】凭借速度优势触发了追加回合！ (第{extra_turn_count}次追加,追加概率{current_add_rate:.2%})")
+                log.append(f"⚡ 【{attacker['name']}】凭借速度优势触发了追加回合！ (第{extra_turn_count}次追加,追加概率{current_add_rate:.1%})")
                 continue # 跳过回合交换，继续攻击
 
         # 步骤8: 切换攻击方

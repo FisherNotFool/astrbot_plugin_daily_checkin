@@ -809,7 +809,7 @@ class DailyCheckinPlugin(Star):
             return
 
         # 格式化输出
-        title = "--- 📝 玩家昵称列表 📝 ---"
+        title = "\n--- 📝 玩家昵称列表 📝 ---"
         # 使用 enumerate 创建带编号的列表
         formatted_list = [f"{i+1}. {name}" for i, name in enumerate(nicknames)]
 

@@ -649,7 +649,13 @@ class DailyCheckinPlugin(Star):
                 grade_info = self.game_constants['grade_info'][item_info['grade']]
                 upgrade_req = grade_info.get('upgrade_req')
 
-                reply_msg = f"叮！【{slot_name}】强化成功！当前 +{new_level} (成功率: {success_rate:.1%})"
+                reply_msg =(       f"\n✨ 强化成功啦！ ✨\n"
+                                    f"❀✧⋆✦❃⋆❃✧❀✧❃⋆❃✦⋆✧❀\n"
+                                    f"💰 当前人品值：{user['rp']} ({costs['rp']} ↓)\n"
+                                    f"💎 当前强化石：{user['resources']['enhancement_stones']} ({costs['stones']} ↓)\n"
+                                    f"🔨 当前{slot_name}: +{new_level} (成功率: {success_rate:.1%})"
+                                    f"❀✧⋆✦❃⋆❃✧❀✧❃⋆❃✦⋆✧❀\n"
+                                    f"继续加油喵~ (≧∇≦)/")
 
                 # 检查是否进阶
                 if upgrade_req and new_level >= upgrade_req:
@@ -664,7 +670,13 @@ class DailyCheckinPlugin(Star):
 
             else:
                 # --- 强化失败 ---
-                reply_msg = f"砰...【{slot_name}】强化失败喵...＞﹏＜ (成功率: {success_rate:.1%})"
+                reply_msg =(       f"\n🌧 强化失败喵... 🌧\n"
+                                    f"❀✧⋆✦❃⋆❃✧❀✧❃⋆❃✦⋆✧❀\n"
+                                    f"💰 当前人品值：{user['rp']} ({costs['rp']} ↓)\n"
+                                    f"💎 当前强化石：{user['resources']['enhancement_stones']} ({costs['stones']} ↓)\n"
+                                    f"🔨 当前{slot_name}: +{new_level} (成功率: {success_rate:.1%})"
+                                    f"❀✧⋆✦❃⋆❃✧❀✧❃⋆❃✦⋆✧❀\n"
+                                    f"继续努力喵〒▽〒")
 
         await self._save_data()
         yield event.plain_result(reply_msg)

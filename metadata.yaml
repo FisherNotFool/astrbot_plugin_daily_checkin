@@ -1,5 +1,5 @@
 name: astrbot_plugin_daily_checkin # 这是你的插件的唯一识别名。
-desc: 这是 AstrBot 的一个签到插件，支持每日随机签文显示和人物养成。 # 插件简短描述
-version: v1.0 # 插件版本号。格式：v1.1.1 或者 v1.1
-author: FoolFish # 作者
+desc: 一个签到插件，包含签文系统、商店系统、人物养成系统、装备系统、强化系统、抽奖系统、PVP系统。 # 插件简短描述
+version: v2.0  # 插件版本号。格式：v1.1.1 或者 v1.1
+author: FisherNotFool # 作者
 repo: https://github.com/FisherNotFool/astrbot_plugin_daily_checkin.git # 插件的仓库地址

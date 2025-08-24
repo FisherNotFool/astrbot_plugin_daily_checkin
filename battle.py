@@ -10,7 +10,7 @@ def simulate_battle(p1_stats: Dict, p2_stats: Dict) -> Tuple[str, str]:
     此函数是PVP和未来PVE的核心，完全兼容。
     """
     # --- 初始化战斗 ---
-    log = ["\n--- ⚔️ 战斗开始 ⚔️ ---"]
+    log = ["\n❀✧⋆✦⋆❃✧ ⚔️ 战斗开始 ⚔️ ✧❃⋆✦⋆✧❀"]
     p1_hp = p1_stats['HP']['final']
     p2_hp = p2_stats['HP']['final']
 
@@ -29,16 +29,16 @@ def simulate_battle(p1_stats: Dict, p2_stats: Dict) -> Tuple[str, str]:
             attacker, defender = p2_stats, p1_stats
             attacker_hp, defender_hp = p2_hp, p1_hp
 
-    log.append(f"速度比拼：{attacker['name']} ({attacker['SPD']['final']:.1f}) vs {defender['name']} ({defender['SPD']['final']:.1f})")
-    log.append(f"✨ 【{attacker['name']}】速度更快，获得先手喵！")
+    log.append(f"速度比拼：{attacker['name']} ({attacker['SPD']['final']:.1f}) vs {defender['name']} ({defender['SPD']['final']:.1f})\n")
+    log.append(f"✨ 【{attacker['name']}】速度更快，获得先手！")
 
     turn_count = 1
     extra_turn_count = 0
 
     # --- 主战斗循环 ---
     while attacker_hp > 0 and defender_hp > 0 and turn_count <= MAX_TURNS:
-        log.append(f"\n❀✧⋆✦❃ 回合 {turn_count} ❃✦⋆✧❀")
-        log.append(f"【{attacker['name']}】 [HP: {int(attacker_hp)}] -> 【{defender['name']}】 [HP: {int(defender_hp)}]")
+        log.append(f"\n——————— 回合 {turn_count}-追加 {extra_turn_count} ———————")
+        log.append(f"【{attacker['name']}】 [HP: {int(attacker_hp)}]  -> 【{defender['name']}】 [HP: {int(defender_hp)}]")
 
         # 步骤2: 命中判定 (使用0-1小数进行计算)
         hit_rate = max(min(attacker['HIT']['final'] - defender['EVD']['final'], 1.0), 0.05)
@@ -73,7 +73,7 @@ def simulate_battle(p1_stats: Dict, p2_stats: Dict) -> Tuple[str, str]:
             current_add_rate = base_add_rate * (0.5 ** extra_turn_count)
             if random.random() <= current_add_rate:
                 extra_turn_count += 1
-                log.append(f"⚡ 【{attacker['name']}】凭借速度优势触发了追加回合！ (第{extra_turn_count}次追加)")
+                log.append(f"⚡ 【{attacker['name']}】凭借速度优势触发了追加回合！ (第{extra_turn_count}次追加,追加概率{current_add_rate*100}%)")
                 continue # 跳过回合交换，继续攻击
 
         # 步骤8: 切换攻击方

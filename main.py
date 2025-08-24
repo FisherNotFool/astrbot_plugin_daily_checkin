@@ -674,7 +674,6 @@ class DailyCheckinPlugin(Star):
                                     f"❀✧⋆✦❃⋆❃✧❀✧❃⋆❃✦⋆✧❀\n"
                                     f"💰 当前人品值：{user['rp']} ({costs['rp']} ↓)\n"
                                     f"💎 当前强化石：{user['resources']['enhancement_stones']} ({costs['stones']} ↓)\n"
-                                    f"🔨 当前{slot_name}: +{new_level} (成功率: {success_rate:.1%})\n"
                                     f"❀✧⋆✦❃⋆❃✧❀✧❃⋆❃✦⋆✧❀\n"
                                     f"继续努力喵〒▽〒")
 

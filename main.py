@@ -374,13 +374,23 @@ class DailyCheckinPlugin(Star):
                     return f"{final:.2%} (+{bonus:.2%})" if bonus else f"{final:.2%}"
                 else:
                     return f"{final:.1f} (+{bonus:.1f})" if bonus else f"{final:.1f}"
+                
+            # 实现五维属性中文显示
+            attr_chinese_name_map = {
+                "strength": "力量",
+                "agility": "敏捷",
+                "stamina": "体力",
+                "intelligence": "智力",
+                "charisma": "魅力"
+            }
 
             # 分栏3: 五维属性
             core_attrs_lines = []
             for key, emoji in [("strength", "💪"), ("agility", "🏃"), ("stamina", "❤️"), ("intelligence", "🧠"), ("charisma", "✨")]:
                 s = stats[key]
+                chinese_name = attr_chinese_name_map[key]
                 bonus_str = f" (+{s['bonus']:.1f})" if s['bonus'] else ""
-                core_attrs_lines.append(f"{emoji} {key.capitalize()}: {s['final']:.1f}{bonus_str}")
+                core_attrs_lines.append(f"{emoji} {chinese_name}: {s['final']:.1f}{bonus_str}")
             core_attrs_str = "\n".join(core_attrs_lines)
 
             # 分栏4: 衍生属性与能级

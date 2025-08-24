@@ -98,7 +98,7 @@ def simulate_battle(p1_stats: Dict, p2_stats: Dict) -> Tuple[str, str]:
         log.append(f"根据剩余血量百分比判定: 【{p1_stats['name']}】 ({p1_hp_percent:.1%}) vs 【{p2_stats['name']}】 ({p2_hp_percent:.1%})")
 
     if winner:
-        log.append(f"\n--- 👑 战斗结束，胜者是【{winner['name']}】！ ---")
+        log.append(f"\n👑 战斗结束，胜者是【{winner['name']}】！")
         return winner['name'], "\n".join(log)
     else:
         log.append(f"\n--- 🤝 战斗结束，双方平局！ ---")

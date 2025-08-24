@@ -333,7 +333,7 @@ class DailyCheckinPlugin(Star):
             user = self.user_data[user_id]
 
             # 1. 调用核心引擎，获取所有最终计算数据
-            stats = utils.get_detailed_player_stats(user, self.equipment_presets, self.game_constants)
+            stats = utils.get_detailed_player_stats(user, self.equipment_presets, self.game_constants, self.config)
 
             nickname = user.get("nickname", "尚未设置")
             divider = "❀✧⋆✦❃⋆❃✧❀✧❃⋆❃✦⋆✧❀"
@@ -376,33 +376,34 @@ class DailyCheckinPlugin(Star):
                     return f"{final:.1f} (+{bonus:.1f})" if bonus else f"{final:.1f}"
 
             # 分栏3: 五维属性
-            core_attrs_lines = [
-                f"💪 力量: {format_stat(stats['strength'])}",
-                f"🏃 敏捷: {format_stat(stats['agility'])}",
-                f"❤️ 体力: {format_stat(stats['stamina'])}",
-                f"🧠 智力: {format_stat(stats['intelligence'])}",
-                f"✨ 魅力: {format_stat(stats['charisma'])}"
-            ]
+            core_attrs_lines = []
+            for key, emoji in [("strength", "💪"), ("agility", "🏃"), ("stamina", "❤️"), ("intelligence", "🧠"), ("charisma", "✨")]:
+                s = stats[key]
+                bonus_str = f" (+{s['bonus']:.1f})" if s['bonus'] else ""
+                core_attrs_lines.append(f"{emoji} {key.capitalize()}: {s['final']:.1f}{bonus_str}")
             core_attrs_str = "\n".join(core_attrs_lines)
 
             # 分栏4: 衍生属性与能级
             # 注意HP的格式化是整数
-            hp_final, hp_bonus = int(stats['HP']['final']), stats['HP']['bonus_percent']
-            hp_str = f"{hp_final} (+{hp_bonus:.2%})" if hp_bonus else str(hp_final)
-
-            derivatives_lines = [
-                f"🩸 生命值: {hp_str}",
-                f"💥 攻击力: {format_stat(stats['ATK'])}",
-                f"🛡️ 防御力: {format_stat(stats['DEF'])}",
-                f"⚡ 速度: {format_stat(stats['SPD'])}",
-                f"🎯 命中率: {format_stat(stats['HIT'], True)}",
-                f"🍃 闪避率: {format_stat(stats['EVD'], True)}",
-                f"💥 暴击率: {format_stat(stats['CRIT'], True)}",
-                f"☠️ 暴击倍率: {format_stat(stats['CRIT_MUL'],True)}",
-                f"🛡️ 格挡率: {format_stat(stats['BLK'], True)}",
-                f"🩹 格挡减伤: {format_stat(stats['BLK_MUL'], True)}",
-                f"🔮 能级: {stats['energy_level']['value']:.2f} ({stats['energy_level']['rank']})"
+            derivatives_lines = []
+            # (属性键, 中文名, emoji, 是否为纯百分比)
+            attr_map = [
+                ("HP", "生命值", "🩸", True), ("ATK", "攻击力", "💥", True), ("DEF", "防御力", "🛡️", True),
+                ("SPD", "速度", "⚡", True), ("HIT", "命中率", "🎯", True), ("EVD", "闪避率", "🍃", True),
+                ("CRIT", "暴击率", "💥", True), ("CRIT_MUL", "暴击倍率", "☠️", True),
+                ("BLK", "格挡率", "🛡️", True), ("BLK_MUL", "格挡减伤", "🩹", True)
             ]
+            for key, name, emoji, is_pure_percent in attr_map:
+                s = stats[key]
+                bonus_str = f" (+{s['bonus_percent']:.2%})" if s['bonus_percent'] else ""
+                if is_pure_percent:
+                    derivatives_lines.append(f"{emoji} {name}: {s['final']:.2%}{bonus_str}")
+                else:
+                    final_val = int(s['final']) if key == "HP" else f"{s['final']:.1f}"
+                    derivatives_lines.append(f"{emoji} {name}: {final_val}{bonus_str}")
+
+            energy = stats['energy_level']
+            derivatives_lines.append(f"🔮 能级: {energy['value']:.2f} ({energy['rank']})")
             derivatives_str = "\n".join(derivatives_lines)
 
             # --- 3. 组装最终回复 ---

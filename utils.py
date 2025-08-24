@@ -20,61 +20,59 @@ def get_energy_rank(level: float, ranks_config: List[Dict]) -> str:
             return rank_info.get("rank", "Unknown")
     return "F" # 默认最低等级
 
-def get_detailed_player_stats(user_data: Dict, presets: Dict, constants: Dict) -> Dict:
+def get_detailed_player_stats(user_data: Dict, presets: Dict, constants: Dict, config: Dict) -> Dict:
     """
-    计算玩家最终详细属性的主函数。
-    这是所有需要战斗属性的指令的唯一入口点。
+    [修正版] 计算玩家最终详细属性的主函数。
     """
-    # 1. 计算装备提供的总属性加成
-    total_equip_bonus = _calculate_total_equipment_bonus(user_data, presets, constants)
+    # 1. 计算装备提供的总属性加成 (百分比形式)
+    total_equip_bonus_percent = _calculate_total_equipment_bonus(user_data, presets, constants)
 
     # 2. 计算最终五维属性
     base_attrs = user_data.get("attributes", {})
-    final_core_attrs = {
-        "S": base_attrs.get("strength", 0) + total_equip_bonus.get("S", 0),
-        "T": base_attrs.get("stamina", 0) + total_equip_bonus.get("T", 0),
-        "A": base_attrs.get("agility", 0) + total_equip_bonus.get("A", 0),
-        "C": base_attrs.get("charisma", 0) + total_equip_bonus.get("C", 0),
-        "I": base_attrs.get("intelligence", 0) + total_equip_bonus.get("I", 0)
-    }
+    final_core_attrs = {}
+    core_bonus_values = {} # 存储实际加成数值
+    for key_upper, key_lower in {"S": "strength", "T": "stamina", "A": "agility", "C": "charisma", "I": "intelligence"}.items():
+        base_val = base_attrs.get(key_lower, 0)
+        bonus_percent = total_equip_bonus_percent.get(key_upper, 0)
+        # [核心修正] 计算实际加成值
+        bonus_val = base_val * bonus_percent
+        final_core_attrs[key_upper] = base_val + bonus_val
+        core_bonus_values[key_upper] = bonus_val
 
-    # 3. 基于最终五维，计算基础衍生属性
+    # 3. 计算基础衍生属性
     base_derivatives = _calculate_base_derivatives(final_core_attrs)
 
-    # 4. 应用装备的百分比加成，得到最终衍生属性
+    # 4. 应用装备百分比加成，得到最终衍生属性
     final_derivatives = {
-        key: base_val * (1 + total_equip_bonus.get(f"{key}%", 0))
+        key: base_val * (1 + total_equip_bonus_percent.get(f"{key}%", 0))
         for key, base_val in base_derivatives.items()
     }
 
-    # 5. 组装成详细的、带过程的返回结果
+    # [核心修正] 能级计算现在从 config 读取配置
+    energy_value = calculate_energy_level(final_core_attrs, config.get("level_formula", {}))
+    energy_rank = get_energy_rank(energy_value, config.get("level_ranks", []))
+
+    # 5. 组装返回结果
     detailed_stats = {
-        "strength": {"base": base_attrs.get("strength",0), "bonus": total_equip_bonus.get("S", 0), "final": final_core_attrs["S"]},
-        "stamina": {"base": base_attrs.get("stamina",0), "bonus": total_equip_bonus.get("T", 0), "final": final_core_attrs["T"]},
-        "agility": {"base": base_attrs.get("agility",0), "bonus": total_equip_bonus.get("A", 0), "final": final_core_attrs["A"]},
-        "charisma": {"base": base_attrs.get("charisma",0), "bonus": total_equip_bonus.get("C", 0), "final": final_core_attrs["C"]},
-        "intelligence": {"base": base_attrs.get("intelligence",0), "bonus": total_equip_bonus.get("I", 0), "final": final_core_attrs["I"]},
-        "HP": {"base": base_derivatives["HP"], "bonus_percent": total_equip_bonus.get("HP%", 0), "final": final_derivatives["HP"]},
-        "ATK": {"base": base_derivatives["ATK"], "bonus_percent": total_equip_bonus.get("ATK%", 0), "final": final_derivatives["ATK"]},
-        "DEF": {"base": base_derivatives["DEF"], "bonus_percent": total_equip_bonus.get("DEF%", 0), "final": final_derivatives["DEF"]},
-        "SPD": {"base": base_derivatives["SPD"], "bonus_percent": total_equip_bonus.get("SPD%", 0), "final": final_derivatives["SPD"]},
-        "CRIT": {"base": base_derivatives["CRIT"], "bonus_percent": total_equip_bonus.get("CRIT%", 0), "final": final_derivatives["CRIT"]},
-        "CRIT_MUL": {"base": base_derivatives["CRIT_MUL"], "bonus_percent": total_equip_bonus.get("CRIT_MUL%", 0), "final": final_derivatives["CRIT_MUL"]},
-        "HIT": {"base": base_derivatives["HIT"], "bonus_percent": total_equip_bonus.get("HIT%", 0), "final": final_derivatives["HIT"]},
-        "EVD": {"base": base_derivatives["EVD"], "bonus_percent": total_equip_bonus.get("EVD%", 0), "final": final_derivatives["EVD"]},
-        "BLK": {"base": base_derivatives["BLK"], "bonus_percent": total_equip_bonus.get("BLK%", 0), "final": final_derivatives["BLK"]},
-        "BLK_MUL": {"base": base_derivatives["BLK_MUL"], "bonus_percent": total_equip_bonus.get("BLK_MUL%", 0), "final": final_derivatives["BLK_MUL"]},
+        "strength": {"base": base_attrs.get("strength",0), "bonus": core_bonus_values.get("S", 0), "final": final_core_attrs["S"]},
+        "stamina": {"base": base_attrs.get("stamina",0), "bonus": core_bonus_values.get("T", 0), "final": final_core_attrs["T"]},
+        "agility": {"base": base_attrs.get("agility",0), "bonus": core_bonus_values.get("A", 0), "final": final_core_attrs["A"]},
+        "charisma": {"base": base_attrs.get("charisma",0), "bonus": core_bonus_values.get("C", 0), "final": final_core_attrs["C"]},
+        "intelligence": {"base": base_attrs.get("intelligence",0), "bonus": core_bonus_values.get("I", 0), "final": final_core_attrs["I"]},
+        "HP": {"base": base_derivatives["HP"], "bonus_percent": total_equip_bonus_percent.get("HP%", 0), "final": final_derivatives["HP"]},
+        "ATK": {"base": base_derivatives["ATK"], "bonus_percent": total_equip_bonus_percent.get("ATK%", 0), "final": final_derivatives["ATK"]},
+        "DEF": {"base": base_derivatives["DEF"], "bonus_percent": total_equip_bonus_percent.get("DEF%", 0), "final": final_derivatives["DEF"]},
+        "SPD": {"base": base_derivatives["SPD"], "bonus_percent": total_equip_bonus_percent.get("SPD%", 0), "final": final_derivatives["SPD"]},
+        "CRIT": {"base": base_derivatives["CRIT"], "bonus_percent": total_equip_bonus_percent.get("CRIT%", 0), "final": final_derivatives["CRIT"]},
+        "CRIT_MUL": {"base": base_derivatives["CRIT_MUL"], "bonus_percent": total_equip_bonus_percent.get("CRIT_MUL%", 0), "final": final_derivatives["CRIT_MUL"]},
+        "HIT": {"base": base_derivatives["HIT"], "bonus_percent": total_equip_bonus_percent.get("HIT%", 0), "final": final_derivatives["HIT"]},
+        "EVD": {"base": base_derivatives["EVD"], "bonus_percent": total_equip_bonus_percent.get("EVD%", 0), "final": final_derivatives["EVD"]},
+        "BLK": {"base": base_derivatives["BLK"], "bonus_percent": total_equip_bonus_percent.get("BLK%", 0), "final": final_derivatives["BLK"]},
+        "BLK_MUL": {"base": base_derivatives["BLK_MUL"], "bonus_percent": total_equip_bonus_percent.get("BLK_MUL%", 0), "final": final_derivatives["BLK_MUL"]},
+        "energy_level": {"value": energy_value, "rank": energy_rank}
     }
-
-    # 6. 计算能级和排名
-    energy_value = calculate_energy_level(final_core_attrs, constants.get("level_formula", {}))
-    energy_rank = get_energy_rank(energy_value, constants.get("level_ranks", []))
-
-    # 7. 将能级信息也加入到返回的字典中
-    detailed_stats["energy_level"] = {"value": energy_value, "rank": energy_rank}
-    
-
     return detailed_stats
+
 
 
 def _calculate_total_equipment_bonus(user_data: Dict, presets: Dict, constants: Dict) -> Dict:

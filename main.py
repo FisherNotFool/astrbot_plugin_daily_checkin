@@ -630,10 +630,10 @@ class DailyCheckinPlugin(Star):
 
             # 4. 检查资源是否足够
             if user['resources']['enhancement_stones'] < costs['stones']:
-                yield event.plain_result(f"【强化石】不足喵！需要[{costs['stones']}]颗，你只有[{user['resources']['enhancement_stones']}] 颗喵。努力攒攒吧(✿◠‿◠)")
+                yield event.plain_result(f"【强化石】不足喵！需要[{costs['stones']}]颗，你只有[{user['resources']['enhancement_stones']}]颗喵。努力攒攒吧(✿◠‿◠)")
                 return
             if user['rp'] < costs['rp']:
-                yield event.plain_result(f"【人品】不足喵！需要[{costs['rp']}]点，你只有 [{user['rp']}] 点。")
+                yield event.plain_result(f"【人品】不足喵！需要[{costs['rp']}]点，你只有[{user['rp']}]点。")
                 return
 
             # 5. 扣除资源 (无论成功失败都扣)

@@ -37,7 +37,7 @@ def simulate_battle(p1_stats: Dict, p2_stats: Dict) -> Tuple[str, str]:
 
     # --- 主战斗循环 ---
     while attacker_hp > 0 and defender_hp > 0 and turn_count <= MAX_TURNS:
-        log.append(f"\n——————— 回合 {turn_count}-追加 {extra_turn_count} ———————")
+        log.append(f"\n——— 回合 {turn_count}-追加 {extra_turn_count} ———")
         log.append(f"【{attacker['name']}】 [HP: {int(attacker_hp)}]  -> 【{defender['name']}】 [HP: {int(defender_hp)}]")
 
         # 步骤2: 命中判定 (使用0-1小数进行计算)
@@ -73,7 +73,7 @@ def simulate_battle(p1_stats: Dict, p2_stats: Dict) -> Tuple[str, str]:
             current_add_rate = base_add_rate * (0.5 ** extra_turn_count)
             if random.random() <= current_add_rate:
                 extra_turn_count += 1
-                log.append(f"⚡ 【{attacker['name']}】凭借速度优势触发了追加回合！ (第{extra_turn_count}次追加,追加概率{current_add_rate*100}%)")
+                log.append(f"⚡ 【{attacker['name']}】凭借速度优势触发了追加回合！ (第{extra_turn_count}次追加,追加概率{current_add_rate:.2%})")
                 continue # 跳过回合交换，继续攻击
 
         # 步骤8: 切换攻击方

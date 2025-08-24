@@ -597,6 +597,78 @@ class DailyCheckinPlugin(Star):
         await self._save_data()
         yield event.plain_result(reply_msg)
 
+    @filter.command("强化", alias={'enhance'})
+    async def enhance_item(self, event: AstrMessageEvent, slot_name: str):
+        """消耗资源强化当前职业的指定槽位装备。"""
+        user_id = event.get_sender_id()
+
+        # 1. 输入校验
+        slot_map = {"武器": "weapon", "头盔": "head", "胸甲": "chest", "腿甲": "legs", "脚部": "feet"}
+        slot_key = slot_map.get(slot_name)
+        if not slot_key:
+            yield event.plain_result(f"无效的槽位名称喵！请输入以下槽位名称: {', '.join(slot_map.keys())}")
+            return
+
+        async with self.data_lock:
+            # 2. 检查用户和装备是否存在
+            if user_id not in self.user_data:
+                yield event.plain_result("你还没有角色呢，请先使用 /jrrp 创建角色喵！")
+                return
+
+            user = self.user_data[user_id]
+            active_class = user['active_class']
+            item_info = user['equipment_sets'][active_class].get(slot_key)
+
+            if not item_info:
+                yield event.plain_result(f"你当前职业【{active_class}】还没有 [{slot_name}] 装备喵，快去抽奖获取喵(●'◡'●)！")
+                return
+
+            # 3. 计算消耗和成功率
+            current_level = item_info['success_count']
+            costs = utils.get_enhancement_costs(current_level)
+            success_rate = utils.calculate_success_rate(current_level)
+
+            # 4. 检查资源是否足够
+            if user['resources']['enhancement_stones'] < costs['stones']:
+                yield event.plain_result(f"【强化石】不足喵！需要[{costs['stones']}]颗，你只有[{user['resources']['enhancement_stones']}] 颗喵。努力攒攒吧(✿◠‿◠)")
+                return
+            if user['rp'] < costs['rp']:
+                yield event.plain_result(f"【人品】不足喵！需要[{costs['rp']}]点，你只有 [{user['rp']}] 点。")
+                return
+
+            # 5. 扣除资源 (无论成功失败都扣)
+            user['resources']['enhancement_stones'] -= costs['stones']
+            user['rp'] -= costs['rp']
+
+            # 6. 进行强化判定
+            roll = random.random()
+            if roll <= success_rate:
+                # --- 强化成功 ---
+                item_info['success_count'] += 1
+                new_level = item_info['success_count']
+                grade_info = self.game_constants['grade_info'][item_info['grade']]
+                upgrade_req = grade_info.get('upgrade_req')
+
+                reply_msg = f"叮！【{slot_name}】强化成功！当前 +{new_level} (成功率: {success_rate:.1%})"
+
+                # 检查是否进阶
+                if upgrade_req and new_level >= upgrade_req:
+                    grade_order = list(self.game_constants['grade_info'].keys())
+                    current_grade_index = grade_order.index(item_info['grade'])
+                    if current_grade_index < len(grade_order) - 1:
+                        new_grade = grade_order[current_grade_index + 1]
+                        item_info['grade'] = new_grade
+                        item_info['success_count'] = 0
+                        item_name = self.equipment_presets[active_class][slot_key]['names'][new_grade]
+                        reply_msg += f"\n🎉🎉🎉 恭喜！装备进阶为【{new_grade} - {item_name}】！强化等级已重置。"
+
+            else:
+                # --- 强化失败 ---
+                reply_msg = f"砰...【{slot_name}】强化失败喵...＞﹏＜ (成功率: {success_rate:.1%})"
+
+        await self._save_data()
+        yield event.plain_result(reply_msg)
+
     @filter.command("test")
     async def test_set_rp(self, event: AstrMessageEvent, amount: int):
         """

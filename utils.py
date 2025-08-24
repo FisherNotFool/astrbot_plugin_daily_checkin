@@ -147,3 +147,39 @@ def _calculate_base_derivatives(core_attrs: Dict) -> Dict:
 
     # 将概率值（如暴击率）转换为 0-1 的小数，便于后续计算
     return derivatives
+
+def get_enhancement_costs(enhancement_level: int) -> Dict[str, int]:
+    """根据当前强化等级计算消耗的强化石和人品值。"""
+    n = enhancement_level
+
+    # 计算强化石消耗
+    if n <= 5:
+        stone_cost = 1
+    elif 5 < n <= 10:
+        stone_cost = 2
+    elif 10 < n <= 20:
+        stone_cost = 3
+    elif 20 < n <= 25:
+        stone_cost = 4
+    else: # n > 25
+        stone_cost = 5
+
+    # 计算人品消耗
+    if n <= 10:
+        rp_cost = 50 + 5 * n
+    elif 10 < n <= 20:
+        rp_cost = 100 + 150 * (1 - math.exp(-0.3 * (n - 10)))
+    else:  # n > 20
+        rp_cost = 500 - 257.5 * math.exp(-0.1 * (n - 20))
+
+    return {"stones": stone_cost, "rp": int(rp_cost)}
+
+def calculate_success_rate(enhancement_level: int) -> float:
+    """根据当前强化等级计算成功率。"""
+    n = enhancement_level
+    if n <= 20:
+        # 线性衰减：从90%到40%
+        return 0.9 - (0.5 * n / 20)
+    else:
+        # 指数衰减：从40%收敛到10%
+        return 0.1 + 0.3 * math.exp(-0.15 * (n - 20))

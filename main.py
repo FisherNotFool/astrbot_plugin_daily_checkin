@@ -326,11 +326,11 @@ class DailyCheckinPlugin(Star):
         user_id = event.get_sender_id()
 
         async with self.data_lock:
-            if user_id not in self.data["user_data"]:
+            if user_id not in self.user_data:
                 yield event.plain_result("你还没有签到过，没有状态信息哦。请先使用 /jrrp 进行签到。")
                 return
 
-            user = self.data["user_data"][user_id]
+            user = self.user_data[user_id]
 
             # 1. 调用核心引擎，获取所有最终计算数据
             stats = utils.get_detailed_player_stats(user, self.equipment_presets, self.game_constants)

@@ -322,42 +322,102 @@ class DailyCheckinPlugin(Star):
 
     @filter.command("状态", alias={'我的状态', 'status'})
     async def show_status(self, event: AstrMessageEvent):
-        """显示用户的当前状态面板。"""
+        """显示用户全面的、包含装备和详细属性的状态面板。"""
         user_id = event.get_sender_id()
 
         async with self.data_lock:
-            if user_id not in self.user_data:
-                yield event.plain_result("你还没有角色哦，请先使用 /jrrp 签到创建角色喵！")
+            if user_id not in self.data["user_data"]:
+                yield event.plain_result("你还没有签到过，没有状态信息哦。请先使用 /jrrp 进行签到。")
                 return
 
-            user = self.user_data[user_id]
-            attrs = user["attributes"]
-            check_in = user["check_in"]
+            user = self.data["user_data"][user_id]
 
-            # 1. 调用 utils 中的函数进行计算
-            energy_val = utils.calculate_energy_level(attrs, self.config.get("level_formula", {}))
-            energy_rank = utils.get_energy_rank(energy_val, self.config.get("level_ranks", []))
-            derivatives = utils.calculate_derivatives(attrs)
+            # 1. 调用核心引擎，获取所有最终计算数据
+            stats = utils.get_detailed_player_stats(user, self.equipment_presets, self.game_constants)
 
-            # 2. 格式化输出
-            divider = "--- ❀ 个人状态 ❀ ---"
+            nickname = user.get("nickname", "尚未设置")
+            divider = "❀✧⋆✦❃⋆❃✧❀✧❃⋆❃✦⋆✧❀"
+
+            # --- 2. 构建各大分栏 ---
+
+            # 分栏1: 资源
+            res = user.get("resources", {})
+            res_lines = [
+                f"💰 人品: {user.get('rp', 0)}",
+                f"🎟️ 抽奖券: {res.get('draw_tickets', 0)}",
+                f"💎 强化石: {res.get('enhancement_stones', 0)}",
+                f"📅 连续签到: {user.get('check_in', {}).get('continuous_days', 0)} 天"
+            ]
+            resources_str = "\n".join(res_lines)
+
+            # 分栏2: 职业与装备
+            active_class = user.get("active_class", "未知")
+            equipped_items = user.get("equipment_sets", {}).get(active_class, {})
+            equip_lines = [f"⚜️ 职业: {active_class}"]
+            slot_map_cn = {"head": "头部", "chest": "胸甲", "legs": "腿部", "feet": "脚部", "weapon": "武器"}
+            for slot_key, slot_name_cn in slot_map_cn.items():
+                item_info = equipped_items.get(slot_key)
+                if item_info:
+                    grade = item_info['grade']
+                    level = item_info['success_count']
+                    item_name = self.equipment_presets[active_class][slot_key]['names'][grade]
+                    equip_lines.append(f"  {slot_name_cn}: {grade}-{item_name}(+{level})")
+                else:
+                    equip_lines.append(f"  {slot_name_cn}: 未装备")
+            equipment_str = "\n".join(equip_lines)
+
+            # 格式化函数，用于生成 "最终值 (+加成)" 的字符串
+            def format_stat(stat_dict, is_percent=False):
+                final = stat_dict['final']
+                bonus = stat_dict.get('bonus', stat_dict.get('bonus_percent', 0))
+                if is_percent:
+                    return f"{final:.2%} (+{bonus:.2%})" if bonus else f"{final:.2%}"
+                else:
+                    return f"{final:.1f} (+{bonus:.1f})" if bonus else f"{final:.1f}"
+
+            # 分栏3: 五维属性
+            core_attrs_lines = [
+                f"💪 力量: {format_stat(stats['strength'])}",
+                f"🏃 敏捷: {format_stat(stats['agility'])}",
+                f"❤️ 体力: {format_stat(stats['stamina'])}",
+                f"🧠 智力: {format_stat(stats['intelligence'])}",
+                f"✨ 魅力: {format_stat(stats['charisma'])}"
+            ]
+            core_attrs_str = "\n".join(core_attrs_lines)
+
+            # 分栏4: 衍生属性与能级
+            # 注意HP的格式化是整数
+            hp_final, hp_bonus = int(stats['HP']['final']), stats['HP']['bonus_percent']
+            hp_str = f"{hp_final} (+{hp_bonus:.2%})" if hp_bonus else str(hp_final)
+
+            derivatives_lines = [
+                f"🩸 生命值: {hp_str}",
+                f"💥 攻击力: {format_stat(stats['ATK'])}",
+                f"🛡️ 防御力: {format_stat(stats['DEF'])}",
+                f"⚡ 速度: {format_stat(stats['SPD'])}",
+                f"🎯 命中率: {format_stat(stats['HIT'], True)}",
+                f"🍃 闪避率: {format_stat(stats['EVD'], True)}",
+                f"💥 暴击率: {format_stat(stats['CRIT'], True)}",
+                f"☠️ 暴击倍率: {format_stat(stats['CRIT_MUL'],True)}",
+                f"🛡️ 格挡率: {format_stat(stats['BLK'], True)}",
+                f"🩹 格挡减伤: {format_stat(stats['BLK_MUL'], True)}",
+                f"🔮 能级: {stats['energy_level']['value']:.2f} ({stats['energy_level']['rank']})"
+            ]
+            derivatives_str = "\n".join(derivatives_lines)
+
+            # --- 3. 组装最终回复 ---
             reply = (
-                f"\n{divider}\n"
-                f"💪 力量: {attrs.get('strength', 0):.1f}\n"
-                f"🏃 敏捷: {attrs.get('agility', 0):.1f}\n"
-                f"❤️ 体力: {attrs.get('stamina', 0):.1f}\n"
-                f"🧠 智力: {attrs.get('intelligence', 0):.1f}\n"
-                f"✨ 魅力: {attrs.get('charisma', 0):.1f}\n"
-                f"❀✧⋆✦❃⋆❃✧❀✧❃⋆❃✦⋆✧❀\n"
-                f"🩸 生命值: {derivatives['hp']}\n"
-                f"⚜️ 能级: {energy_val:.2f} ({energy_rank})\n"
-                f"💥 暴击率: {derivatives['crit_rate']:.2%}\n"
-                f"🍃 闪避率: {derivatives['dodge_rate']:.2%}\n"
-                f"❀✧⋆✦❃⋆❃✧❀✧❃⋆❃✦⋆✧❀\n"
-                f"💰 剩余人品: {user.get('rp', 0)}\n"
-                f"📅 连续签到: {check_in.get('continuous_days', 0)} 天"
+                f"\n--- 💠 {nickname}的状态报告 💠 ---\n"
+                f"{resources_str}\n"
+                f"{divider}\n"
+                f"{equipment_str}\n"
+                f"{divider}\n"
+                f"{core_attrs_str}\n"
+                f"{divider}\n"
+                f"{derivatives_str}"
             )
             yield event.plain_result(reply)
+
 
 
     @filter.command("商店", alias={'shop'})

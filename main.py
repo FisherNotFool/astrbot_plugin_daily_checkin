@@ -196,7 +196,7 @@ class DailyCheckinPlugin(Star):
             check_in_info = user["check_in"]
 
             if check_in_info["last_date"] == today_str:
-                yield event.plain_result("你今天已经签到过了，明天再来吧！")
+                yield event.plain_result("你今天已经签到过了，明天再来吧喵！")
                 return
 
             yesterday_str = (date.today() - timedelta(days=1)).isoformat()
@@ -258,8 +258,8 @@ class DailyCheckinPlugin(Star):
                 f"{ticket_bonus_msg}\n"
                 f"{divider}"
             )
-            await self._save_data()     #立即保存一次数据
             yield event.plain_result(reply)
+        await self._save_data()     #立即保存一次数据
 
     @filter.command("设置昵称", alias={'set_nickname'})
     async def set_nickname(self, event: AstrMessageEvent, nickname: str):
@@ -281,7 +281,7 @@ class DailyCheckinPlugin(Star):
             self.user_data[user_id]['nickname'] = nickname
 
         await self._save_data() # 立即保存重要变更
-        yield event.plain_result(f"昵称设置成功！你现在是 “{nickname}” 啦！")
+        yield event.plain_result(f"昵称设置成功！你的昵称现在是 “{nickname}” 啦！")
 
 
     @filter.command("切换职业", alias={'set_class'})
@@ -294,7 +294,7 @@ class DailyCheckinPlugin(Star):
 
         if not target_class:
             yield event.plain_result(
-                "无效的职业喵！(￣ε(#￣) 请输入职业全名或对应数字：\n"
+                "\n无效的职业喵！(￣ε(#￣) 请输入职业全名或对应数字：\n"
                 "1. 均衡使者\n"
                 "2. 狂刃战士\n"
                 "3. 磐石守卫\n"
@@ -411,10 +411,10 @@ class DailyCheckinPlugin(Star):
         # 使用不同的分隔线和表情符号增强视觉效果
         reply = (
             "\n📦 今日商店 📦\n"
-            "==================\n"
+            "❀✧⋆✦❃⋆❃✧❀✧❃⋆❃✦⋆✧❀\n"
             f"{'\n'.join(shop_items_str)}\n"
             f"   🎟️ 抽奖券 - {draw_ticket_price}\n"
-            "==================\n"
+            "❀✧⋆✦❃⋆❃✧❀✧❃⋆❃✦⋆✧❀\n"
             f"🎯 剩余属性总购买次数: {remaining}/{daily_limit}\n"
             f"😉 你的人品值: {user_rp} {rp_emoji}\n"
             "💡 提示: 先到先得，机不可失失不再来~"
@@ -455,11 +455,11 @@ class DailyCheckinPlugin(Star):
                         user['resources']['draw_tickets'] += quantity
                         reply_message = (
                             f"\n✨ 购买成功啦！ ✨\n"
-                            f"-------------------\n"
+                            f"❀✧⋆✦❃⋆❃✧❀✧❃⋆❃✦⋆✧❀\n"
                             f"消耗人品：{total_cost}\n"
                             f"剩余人品：{user['rp']}\n"
                             f"当前抽奖券：{user['resources']['draw_tickets']} ({quantity}↑)\n"
-                            f"-------------------\n"
+                            f"❀✧⋆✦❃⋆❃✧❀✧❃⋆❃✦⋆✧❀\n"
                             f"继续加油喵~ (≧∇≦)/"
                         )
 
@@ -490,12 +490,12 @@ class DailyCheckinPlugin(Star):
                                 new_attribute_value = user['attributes'][internal_attr_key]
                                 reply_message = (
                                     f"\n✨ 购买成功啦！ ✨\n"
-                                    f"-------------------\n"
+                                    f"❀✧⋆✦❃⋆❃✧❀✧❃⋆❃✦⋆✧❀\n"
                                     f"消耗人品：{total_cost}\n"
                                     f"剩余人品：{user['rp']}\n"
                                     f"当前{item_name}值：{new_attribute_value:.1f} ({total_increment:.1f}↑)\n"
                                     f"剩余属性总购买次数：{shop['remaining_purchases']}次\n"
-                                    f"-------------------\n"
+                                    f"❀✧⋆✦❃⋆❃✧❀✧❃⋆❃✦⋆✧❀\n"
                                     f"继续加油喵~ (≧∇≦)/"
                                 )
         # 在 async with self.data_lock 块结束后，锁已经被释放了
@@ -575,7 +575,7 @@ class DailyCheckinPlugin(Star):
                         results['equipment'].append(f"🎊 【{item_name}】({chosen_class})")
 
             # --- [核心修正] 构建能展示所有奖励的最终报告 ---
-            summary_lines = [f"\n--- 抽奖 {quantity} 次 报告 ---"]
+            summary_lines = [f"\n✧⋆✦❃ 抽奖 {quantity} 次 报告 ❃✦⋆✧"]
             if results['rp'] > 0:
                 summary_lines.append(f"💰 人品 + {results['rp']}")
             if results['stone'] > 0:
@@ -588,7 +588,7 @@ class DailyCheckinPlugin(Star):
             if not any([results['rp'], results['stone'], results['equipment'], results['attribute_bonus']]):
                  summary_lines.append("💨 好像什么都没抽到...下次一定！")
 
-            summary_lines.append("--------------------")
+            summary_lines.append("❀✧⋆✦❃⋆❃✧❀✧❃⋆❃✦⋆✧❀")
             summary_lines.append(f"剩余抽奖券 🎟️: {user['resources']['draw_tickets']} ({quantity} ↓)")
             summary_lines.append(f"当前强化石 💎: {user['resources']['enhancement_stones']} ({results['stone']} ↑)")
             summary_lines.append(f"当前人品值 💰: {user['rp']} ({results['rp']} ↑)")

@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 from typing import Dict
 import random
-from datetime import date, timedelta
+from datetime import date, timedelta, timezone, datetime
 from typing import Dict, Optional, Tuple
 
 # 使用 all 导入，确保所有 API 都可用
@@ -829,7 +829,108 @@ class DailyCheckinPlugin(Star):
 
         yield event.plain_result(reply_message)
 
+    @filter.permission_type(filter.PermissionType.ADMIN)
+    @filter.command("创建活动")
+    async def create_event(self, event: AstrMessageEvent, *, args: str):
+        """
+        [管理员] 创建一个新活动。
+        使用键值对格式，例如: /创建活动 活动名称=炎魔来袭 类型=世界Boss ...
+        """
+        # 注意: 权限检查之后再添加，我们先实现功能
+        if self.active_event.get("is_active"):
+            yield event.plain_result(f"\n错误：当前已有活动 “{self.active_event.get('event_name', '未知')}” 正在进行。请先删除或等待其结束。")
+            return
 
+        # 1. 参数解析器
+        try:
+            params = dict(item.strip().split('=', 1) for item in args.split(' '))
+            event_name = params['活动名称']
+            event_type = params['类型']
+            duration_str = params['时长']
+            five_stats_str = params['五维']
+            rewards_str = params['奖励']
+            boss_name = params.get('名称', event_name) # Boss名称可选，默认为活动名称
+        except (ValueError, KeyError) as e:
+            yield event.plain_result(
+                "\n参数解析失败！请使用正确的键值对格式，并确保包含所有必需项。\n\n"
+                "模板: /创建活动 活动名称=[文本] 类型=世界Boss 名称=[Boss名称] 时长=[数字][d/h/m] 五维=[格式] 奖励=[格式]\n\n"
+                "五维格式示例: S:500,A:150,T:800,I:200,C:100\n"
+                "奖励格式示例: 人品:10000,抽奖券:100,强化石:200,属性点:10"
+            )
+            return
+
+        # 2. 详细参数处理与校验
+        try:
+            # 处理时长
+            unit = duration_str[-1].lower()
+            value = int(duration_str[:-1])
+            if unit == 'd': delta = timedelta(days=value)
+            elif unit == 'h': delta = timedelta(hours=value)
+            elif unit == 'm': delta = timedelta(minutes=value)
+            else: raise ValueError("无法识别的时长单位")
+            start_time = datetime.now(timezone.utc)
+            end_time = start_time + delta
+
+            # 处理五维
+            base_five_stats = {s.split(':')[0].strip().upper(): int(s.split(':')[1]) for s in five_stats_str.split(',')}
+
+            # 处理奖励
+            reward_pool = {}
+            reward_map = {"人品": "rp", "抽奖券": "draw_tickets", "强化石": "enhancement_stones", "属性点": "random_attribute_points"}
+            for r in rewards_str.split(','):
+                name, val = r.split(':')
+                key = reward_map.get(name.strip())
+                if key: reward_pool[key] = float(val) if key == "random_attribute_points" else int(val)
+
+        except Exception as e:
+            yield event.plain_result(f"参数内容格式错误: {e}")
+            return
+
+        # 3. 创建活动数据
+        if event_type == "世界Boss":
+            boss_stats_full = utils.calculate_boss_stats(boss_name, base_five_stats)
+
+            async with self.data_lock:
+                self.active_event = {
+                    "event_name": event_name,
+                    "event_type": "world_boss",
+                    "is_active": True,
+                    "start_time": start_time.isoformat(),
+                    "end_time": end_time.isoformat(),
+                    "event_details": {
+                        "boss_name": boss_name,
+                        "base_five_stats": base_five_stats,
+                        "derived_stats": {key: val['final'] for key, val in boss_stats_full.items() if key != 'name'},
+                        "current_hp": boss_stats_full['HP']['final'],
+                        "reward_pool": reward_pool
+                    },
+                    "participants": {}
+                }
+            await self._save_data()
+            yield event.plain_result(f"✅ 活动 “{event_name}” 创建成功！\nBoss: {boss_name}\n结束时间: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        else:
+            yield event.plain_result(f"错误：未知的活动类型 “{event_type}”。目前只支持“世界Boss”。")
+
+    @filter.permission_type(filter.PermissionType.ADMIN)
+    @filter.command("删除活动")
+    async def delete_event(self, event: AstrMessageEvent, event_name: str):
+        """
+        [管理员] 删除一个正在进行的活动。
+        """
+        # 注意: 权限检查之后再添加
+        if not self.active_event.get("is_active"):
+            yield event.plain_result("错误：当前没有正在进行的活动。")
+            return
+
+        if self.active_event.get("event_name") != event_name:
+            yield event.plain_result(f"错误：输入的活动名称 “{event_name}” 与当前活动 “{self.active_event.get('event_name')}” 不匹配。")
+            return
+
+        async with self.data_lock:
+            self.active_event = {} # 清空活动数据
+
+        await self._save_data()
+        yield event.plain_result(f"✅ 活动 “{event_name}” 已被强制删除。")
 
 
     async def terminate(self):

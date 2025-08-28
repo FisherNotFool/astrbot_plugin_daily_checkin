@@ -125,7 +125,7 @@ class DailyCheckinPlugin(Star):
 
     async def _periodic_save(self):
         """后台循环任务，用于定时保存数据。"""
-        interval = self.config.get("system_settings", {}).get("auto_save_interval_seconds", 300)
+        interval = self.config.get("system_settings", {}).get("auto_save_interval_seconds", 1800)
         while True:
             await asyncio.sleep(interval)
             logger.info(f"开始执行定时保存任务（间隔: {interval}秒）...")
@@ -1073,12 +1073,114 @@ class DailyCheckinPlugin(Star):
             if boss_killed:
                 event_details['current_hp'] = 0
                 self.active_event['is_active'] = False
-                battle_log += "\n\n🎉🎉🎉 你打出了最后一击！Boss已被击败！活动结束，正在准备结算... 🎉🎉🎉"
-                # (未来的结算函数将在这里被调用)
+                battle_log += "\n\n🎉🎉🎉 你打出了最后一击！Boss已被击败！活动结束！ 🎉🎉🎉"
+
+                # 自动调用结算函数
+                settlement_report = await self._settle_rewards()
+                # 将结算报告附加到战斗日志后
+                battle_log += f"\n\n{settlement_report}"
+
 
         await self._save_data()
         # 5. 发送战报
         yield event.plain_result(battle_log)
+
+    async def _settle_rewards(self) -> str:
+        """
+        核心奖励结算函数。
+        计算并分配奖励，然后清空活动。返回一个结算报告字符串。
+        """
+        event_data = self.active_event
+        details = event_data.get("event_details", {})
+        participants = event_data.get("participants", {})
+        reward_pool = details.get("reward_pool", {})
+
+        if not participants:
+            self.active_event = {} # 清空活动
+            return f"活动 “{event_data.get('event_name')}” 已结束，但没有勇士参与，太遗憾了！"
+
+        # 1. 计算总伤害
+        total_damage_all = sum(p.get("total_damage", 0) for p in participants.values())
+        if total_damage_all <= 0:
+            self.active_event = {} # 清空活动
+            return f"活动 “{event_data.get('event_name')}” 已结束，但未造成有效伤害，奖励无法分配。"
+
+        # 2. 检查是否因超时结算，并调整奖池
+        final_reward_pool = reward_pool.copy()
+        boss_max_hp = details.get("derived_stats", {}).get("HP", 1)
+        boss_current_hp = details.get("current_hp", 0)
+        settlement_reason = f"Boss【{details.get('boss_name')}】已被击败！"
+        if boss_current_hp > 0:
+            completion_rate = 1 - (boss_current_hp / boss_max_hp)
+            settlement_reason = f"活动超时结束，伤害完成度 {completion_rate:.2%}"
+            for key, value in final_reward_pool.items():
+                final_reward_pool[key] = value * completion_rate
+
+        # 3. 分配奖励
+        distributed_rewards_summary = {}
+        for user_id, data in participants.items():
+            player_damage = data.get("total_damage", 0)
+            damage_share = player_damage / total_damage_all
+
+            player_rewards = {}
+            # 分配人品、抽奖券、强化石 (向下取整)
+            for key in ["rp", "draw_tickets", "enhancement_stones"]:
+                reward_amount = int(final_reward_pool.get(key, 0) * damage_share)
+                if reward_amount > 0:
+                    self.user_data[user_id]["resources"][key] = self.user_data[user_id].get("resources", {}).get(key, 0) + reward_amount
+                    player_rewards[key] = reward_amount
+
+            # 分配属性点 (保留一位小数)
+            attr_points_total = final_reward_pool.get("random_attribute_points", 0.0)
+            attr_points_gain = round(attr_points_total * damage_share, 1)
+            if attr_points_gain > 0:
+                attr_keys = list(self.INITIAL_ATTRIBUTES.keys())
+                chosen_attr = random.choice(attr_keys)
+                self.user_data[user_id]["attributes"][chosen_attr] = round(self.user_data[user_id]["attributes"][chosen_attr] + attr_points_gain, 1)
+                player_rewards["attribute_points"] = (chosen_attr, attr_points_gain)
+
+            if player_rewards:
+                distributed_rewards_summary[user_id] = player_rewards
+
+        # 4. 生成结算报告
+        id_to_nickname = {uid: udata.get("nickname", f"玩家{uid[-4:]}") for uid, udata in self.user_data.items()}
+        sorted_participants = sorted(participants.items(), key=lambda i: i[1].get("total_damage", 0), reverse=True)
+
+        report_lines = [f"\n--- 🎉 活动 “{event_data.get('event_name')}” 结算报告 🎉 ---", settlement_reason, "\n--- 🏆 最终贡献排名 & 奖励 🏆 ---"]
+        for i, (uid, data) in enumerate(sorted_participants[:5]): # 公布前5名
+            nickname = id_to_nickname.get(uid, f"神秘玩家{uid[-4:]}")
+            damage = int(data.get("total_damage", 0))
+            rewards_str_parts = []
+            player_rewards = distributed_rewards_summary.get(uid, {})
+            if "rp" in player_rewards: rewards_str_parts.append(f"人品+{player_rewards['rp']}")
+            if "draw_tickets" in player_rewards: rewards_str_parts.append(f"抽奖券+{player_rewards['draw_tickets']}")
+            if "enhancement_stones" in player_rewards: rewards_str_parts.append(f"强化石+{player_rewards['enhancement_stones']}")
+            if "attribute_points" in player_rewards: rewards_str_parts.append(f"{player_rewards['attribute_points'][0].capitalize()}+{player_rewards['attribute_points'][1]}")
+
+            rewards_str = ", ".join(rewards_str_parts) if rewards_str_parts else "无"
+            report_lines.append(f"No.{i+1} {nickname} - {damage}伤害 [{rewards_str}]")
+
+        # 5. 清空当前活动
+        self.active_event = {}
+        return "\n".join(report_lines)
+
+    @filter.command("结算活动")
+    async def settle_event(self, event: AstrMessageEvent):
+        """[管理员] 手动结算已超时的活动。"""
+        if not self.active_event.get("is_active"):
+            yield event.plain_result("错误：当前没有正在进行的活动。")
+            return
+
+        end_time = datetime.fromisoformat(self.active_event.get("end_time"))
+        if datetime.now(timezone.utc) <= end_time:
+            yield event.plain_result("活动尚未超时，无法手动结算。请等待活动结束或使用 /删除活动。")
+            return
+
+        async with self.data_lock:
+            report = await self._settle_rewards()
+
+        await self._save_data()
+        yield event.plain_result(report)
 
 
     async def terminate(self):

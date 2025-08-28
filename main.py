@@ -1001,7 +1001,7 @@ class DailyCheckinPlugin(Star):
             # 3. 组装最终回复
             boss_name = details.get("boss_name", "未知Boss")
             reply = (
-                f"--- 🔥 活动状态 🔥 ---\n"
+                f"\n--- 🔥 活动状态 🔥 ---\n"
                 f"Boss: {boss_name}\n"
                 f"血量: {hp_percent:.2%} ({int(current_hp)}/{int(max_hp)})\n"
                 f"剩余时间: {time_left_str}\n"
@@ -1009,6 +1009,76 @@ class DailyCheckinPlugin(Star):
             )
 
             yield event.plain_result(reply)
+
+
+    @filter.command("PVE")
+    async def attack_boss(self, event: AstrMessageEvent):
+        """向当前活动的世界Boss发起挑战。"""
+        user_id = event.get_sender_id()
+        today_str = date.today().isoformat()
+
+        if not self.active_event.get("is_active"):
+            yield event.plain_result("当前没有正在进行的活动哦~")
+            return
+
+        # 检查活动是否已超时
+        end_time = datetime.fromisoformat(self.active_event.get("end_time"))
+        if datetime.now(timezone.utc) > end_time:
+            yield event.plain_result("抱歉，本次活动已经结束了喵。")
+            return
+
+        async with self.data_lock:
+            # 1. 检查玩家数据和挑战资格
+            player_data = self.user_data.get(user_id)
+            if not player_data:
+                yield event.plain_result("你还没有角色喵，请先 /jrrp 创建角色喵！")
+                return
+            
+            if not player_data or not player_data.get("nickname"):
+                yield event.plain_result("你还没有设置昵称喵！请先使用 `/设置昵称` 来打响你的名号！")
+                return
+
+            participant_info = self.active_event["participants"].get(user_id, {})
+            if participant_info.get("last_attack_date") == today_str:
+                yield event.plain_result("你今天已经挑战过Boss了，明天再来吧！")
+                return
+
+            event_details = self.active_event["event_details"]
+            boss_name = event_details["boss_name"]
+
+            # 2. 为玩家和Boss生成战斗属性
+            player_stats = utils.get_detailed_player_stats(player_data, self.equipment_presets, self.game_constants, self.config)
+            player_stats['name'] = player_data.get("nickname", f"玩家{user_id[-4:]}")
+
+            boss_base_stats = event_details["base_five_stats"]
+            boss_stats = utils.calculate_boss_stats(boss_name, boss_base_stats)
+            # 确保Boss的HP是当前剩余血量
+            boss_stats['HP']['final'] = event_details['current_hp']
+
+            # 3. 调用升级后的战斗模拟器
+            # 玩家是挑战者 (challenger), Boss是被挑战者 (defender)
+            winner_name, battle_log, damage_report = battle.simulate_battle(player_stats, boss_stats)
+
+            # 4. 处理战斗结果，记录伤害
+            player_damage_dealt = damage_report.get(player_stats['name'], 0)
+            event_details['current_hp'] -= player_damage_dealt
+
+            # 更新参与者数据
+            participant_info['total_damage'] = participant_info.get('total_damage', 0) + player_damage_dealt
+            participant_info['last_attack_date'] = today_str
+            self.active_event["participants"][user_id] = participant_info
+
+            # 检查Boss是否被击杀
+            boss_killed = event_details['current_hp'] <= 0
+            if boss_killed:
+                event_details['current_hp'] = 0
+                self.active_event['is_active'] = False
+                battle_log += "\n\n🎉🎉🎉 你打出了最后一击！Boss已被击败！活动结束，正在准备结算... 🎉🎉🎉"
+                # (未来的结算函数将在这里被调用)
+
+        await self._save_data()
+        # 5. 发送战报
+        yield event.plain_result(battle_log)
 
 
     async def terminate(self):

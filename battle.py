@@ -14,6 +14,8 @@ def simulate_battle(p1_stats: Dict, p2_stats: Dict) -> Tuple[str, str]:
     p1_hp = p1_stats['HP']['final']
     p2_hp = p2_stats['HP']['final']
 
+    damage_stats = { p1_stats['name']: 0, p2_stats['name']: 0 }
+
     # 步骤1: 速度判定先手
     if p1_stats['SPD']['final'] > p2_stats['SPD']['final']:
         attacker, defender = p1_stats, p2_stats
@@ -61,6 +63,7 @@ def simulate_battle(p1_stats: Dict, p2_stats: Dict) -> Tuple[str, str]:
             # 步骤6: 防御力结算最终伤害
             dr_def = min(defender['DEF']['final'] / (defender['DEF']['final'] + K_CONSTANT), 0.5) # 防御上限50%
             final_damage = max(pre_damage * (1 - dr_def), 1)
+            damage_stats[attacker['name']] += final_damage
             defender_hp -= final_damage
             log.append(f"💔 【{defender['name']}】受到[{int(final_damage)}]点伤害，剩余HP: [{max(0, int(defender_hp))}]")
 
@@ -99,7 +102,7 @@ def simulate_battle(p1_stats: Dict, p2_stats: Dict) -> Tuple[str, str]:
 
     if winner:
         log.append(f"\n👑 战斗结束，胜者是【{winner['name']}】！")
-        return winner['name'], "\n".join(log)
+        return winner['name'], "\n".join(log), damage_stats
     else:
         log.append(f"\n--- 🤝 战斗结束，双方平局！ ---")
-        return "平局", "\n".join(log)
+        return "平局", "\n".join(log), damage_stats

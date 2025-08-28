@@ -15,7 +15,7 @@ from astrbot.api import logger # 使用 astrbot 提供的 logger 接口
 from . import utils, battle
 
 
-@register("daily_checkin", "FoolFish", "一个QQ群签到成长系统", "2.0.0")
+@register("daily_checkin", "FoolFish", "一个QQ群签到成长系统", "2.0.1")
 class DailyCheckinPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)

@@ -866,7 +866,7 @@ class DailyCheckinPlugin(Star):
                 f"错误类型: {error_type}\n"
                 f"具体信息: `{e}`\n\n"
                 "--- 请检查并使用以下模板 ---\n"
-                "模板: /创建活动 活动名称=[文本] 类型=世界Boss 名称=[可选] 时长=[数字][d/h/m] 五维=[格式] 奖励=[格式]\n\n"
+                "模板: /创建活动 活动名称=[文本] 类型=世界Boss 名称=[Boss名称可选] 时长=[数字][d/h/m] 五维=[S:1,A:1,T:1,I:1,C:1] 奖励=[人品:1,抽奖券:1,强化石:1,属性点:1]\n\n"
                 "五维格式示例: S:500,A:150,T:800,I:200,C:100\n"
                 "奖励格式示例: 人品:10000,抽奖券:100,强化石:200,属性点:10"
             )
@@ -946,6 +946,69 @@ class DailyCheckinPlugin(Star):
         await self._save_data()
         yield event.plain_result(f"✅ 活动 “{event_name}” 已被强制删除。")
 
+    @filter.command("活动状态")
+    async def show_event_status(self, event: AstrMessageEvent):
+        """显示当前活动的状态，包括Boss信息和伤害排行榜。"""
+        if not self.active_event.get("is_active"):
+            yield event.plain_result("当前没有正在进行的活动哦~")
+            return
+
+        async with self.data_lock:
+            event_data = self.active_event
+            details = event_data.get("event_details", {})
+            participants = event_data.get("participants", {})
+
+            # 1. 计算Boss血量百分比和活动剩余时间
+            max_hp = details.get("derived_stats", {}).get("HP", 1)
+            current_hp = details.get("current_hp", 0)
+            hp_percent = max(0, current_hp / max_hp) if max_hp > 0 else 0
+
+            end_time_str = event_data.get("end_time")
+            try:
+                end_time = datetime.fromisoformat(end_time_str)
+                time_left = end_time - datetime.now(timezone.utc)
+                if time_left.total_seconds() < 0:
+                    time_left_str = "已结束"
+                else:
+                    days, remainder = divmod(time_left.seconds, 86400)
+                    hours, remainder = divmod(remainder, 3600)
+                    minutes, _ = divmod(remainder, 60)
+                    time_left_str = f"{time_left.days}天{hours}小时{minutes}分"
+            except (ValueError, TypeError):
+                time_left_str = "未知"
+
+            # 2. 构建伤害排行榜
+            # sorted() 函数返回一个列表，其中每个元素都是 (user_id, {damage_info}) 的元组
+            sorted_participants = sorted(
+                participants.items(),
+                key=lambda item: item[1].get("total_damage", 0),
+                reverse=True
+            )
+
+            ranking_lines = ["--- ⚔️ 伤害排行榜 ⚔️ ---"]
+            # 我们需要通过 user_id 查找昵称
+            id_to_nickname_map = {uid: udata.get("nickname", f"玩家{uid[-4:]}") for uid, udata in self.user_data.items()}
+
+            for i, (user_id, data) in enumerate(sorted_participants[:10]): # 最多显示前10名
+                rank = i + 1
+                nickname = id_to_nickname_map.get(user_id, f"神秘玩家{user_id[-4:]}")
+                damage = int(data.get("total_damage", 0))
+                ranking_lines.append(f"No.{rank} {nickname} - {damage} 伤害")
+
+            if not sorted_participants:
+                ranking_lines.append("还没有勇士发起挑战...")
+
+            # 3. 组装最终回复
+            boss_name = details.get("boss_name", "未知Boss")
+            reply = (
+                f"--- 🔥 活动状态 🔥 ---\n"
+                f"Boss: {boss_name}\n"
+                f"血量: {hp_percent:.2%} ({int(current_hp)}/{int(max_hp)})\n"
+                f"剩余时间: {time_left_str}\n"
+                f"{'\n'.join(ranking_lines)}"
+            )
+
+            yield event.plain_result(reply)
 
 
     async def terminate(self):

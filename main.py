@@ -1038,10 +1038,10 @@ class DailyCheckinPlugin(Star):
                 yield event.plain_result("你还没有设置昵称喵！请先使用 `/设置昵称` 来打响你的名号！")
                 return
 
-            participant_info = self.active_event["participants"].get(user_id, {})
-            if participant_info.get("last_attack_date") == today_str:
-                yield event.plain_result("你今天已经挑战过Boss了，明天再来吧！")
-                return
+            #participant_info = self.active_event["participants"].get(user_id, {})
+            #if participant_info.get("last_attack_date") == today_str:
+                #yield event.plain_result("你今天已经挑战过Boss了，明天再来吧！")
+                #return
 
             event_details = self.active_event["event_details"]
             boss_name = event_details["boss_name"]

@@ -837,56 +837,48 @@ class DailyCheckinPlugin(Star):
         [管理员] 创建一个新活动。
         使用键值对格式，例如: /创建活动 活动名称=炎魔来袭 类型=世界Boss ...
         """
-        # 注意: 权限检查之后再添加，我们先实现功能
         if self.active_event.get("is_active"):
             yield event.plain_result(f"错误：当前已有活动 “{self.active_event.get('event_name', '未知')}” 正在进行。请先删除或等待其结束。")
             return
 
-        # 1. [核心修正] 使用正则表达式进行健壮的参数解析
+        # 1. [已修复] 使用更健壮的参数解析器
         try:
-            # 这个正则表达式可以匹配 key="value with space" 或者 key=valuewithoutspace
-            pattern = re.compile(r'(\S+?)=(".*?"|[\S,:]+)')
-            matches = pattern.findall(args)
-            # 将匹配结果转换为字典，并去除值中的引号
-            params = {k: v.strip('"') for k, v in matches}
-
-            # 确认所有必需的键都存在
-            required_keys = ['活动名称', '类型', '时长', '五维', '奖励']
-            if not all(key in params for key in required_keys):
-                raise KeyError("缺少必要的参数")
+            # 使用 args.split() 智能处理各种空格情况
+            params = dict(item.strip().split('=', 1) for item in args.split())
 
             event_name = params['活动名称']
             event_type = params['类型']
             duration_str = params['时长']
             five_stats_str = params['五维']
             rewards_str = params['奖励']
-            boss_name = params.get('名称', event_name)
-        except (KeyError, ValueError) as e:
-            # 统一的错误出口，提示正确的格式
+            boss_name = params.get('名称', event_name) # Boss名称可选，默认为活动名称
+
+        except (ValueError, KeyError) as e:
+            # 2. [已优化] 提供更详细的错误报告
+            error_type = "缺少必需的参数或格式错误" if isinstance(e, KeyError) else "参数分割错误"
             yield event.plain_result(
-                f"参数解析失败或缺少必要项 ({e})！请使用正确的键值对格式。\n\n"
+                f"❌ 参数解析失败！\n"
+                f"错误类型: {error_type}\n"
+                f"具体信息: `{e}`\n\n"
+                "--- 请检查并使用以下模板 ---\n"
                 "模板: /创建活动 活动名称=[文本] 类型=世界Boss 名称=[可选] 时长=[数字][d/h/m] 五维=[格式] 奖励=[格式]\n\n"
                 "五维格式示例: S:500,A:150,T:800,I:200,C:100\n"
                 "奖励格式示例: 人品:10000,抽奖券:100,强化石:200,属性点:10"
             )
             return
 
-        # 2. 详细参数处理与校验 (这部分逻辑不变)
+        # 2. 详细参数处理与校验
         try:
-            # 处理时长
+            # ... (这部分代码保持不变) ...
             unit = duration_str[-1].lower()
             value = int(duration_str[:-1])
             if unit == 'd': delta = timedelta(days=value)
             elif unit == 'h': delta = timedelta(hours=value)
             elif unit == 'm': delta = timedelta(minutes=value)
-            else: raise ValueError("无法识别的时长单位")
-            start_time = datetime.now(timezone.utc)
-            end_time = start_time + delta
+            else: raise ValueError("无法识别的时长单位 (请使用 d/h/m)")
 
-            # 处理五维
             base_five_stats = {s.split(':')[0].strip().upper(): int(s.split(':')[1]) for s in five_stats_str.split(',')}
 
-            # 处理奖励
             reward_pool = {}
             reward_map = {"人品": "rp", "抽奖券": "draw_tickets", "强化石": "enhancement_stones", "属性点": "random_attribute_points"}
             for r in rewards_str.split(','):
@@ -894,20 +886,25 @@ class DailyCheckinPlugin(Star):
                 key = reward_map.get(name.strip())
                 if key: reward_pool[key] = float(val) if key == "random_attribute_points" else int(val)
 
+            # [新增] 校验所有必需项是否都被成功解析
+            if not all([event_name, event_type, base_five_stats, reward_pool]):
+                raise ValueError("五维或奖励中有未能识别的键")
+
         except Exception as e:
-            yield event.plain_result(f"参数内容格式错误: {e}")
+            yield event.plain_result(f"❌ 参数内容格式错误！\n具体信息: `{e}`\n请仔细检查你的时长、五维和奖励格式。")
             return
 
-        # 3. 创建活动数据 (这部分逻辑不变)
+        # 3. 创建活动数据 (保持不变)
         if event_type == "世界Boss":
             boss_stats_full = utils.calculate_boss_stats(boss_name, base_five_stats)
+
             async with self.data_lock:
                 self.active_event = {
                     "event_name": event_name,
                     "event_type": "world_boss",
                     "is_active": True,
-                    "start_time": start_time.isoformat(),
-                    "end_time": end_time.isoformat(),
+                    "start_time": datetime.now(timezone.utc).isoformat(),
+                    "end_time": (datetime.now(timezone.utc) + delta).isoformat(),
                     "event_details": {
                         "boss_name": boss_name,
                         "base_five_stats": base_five_stats,
@@ -918,7 +915,7 @@ class DailyCheckinPlugin(Star):
                     "participants": {}
                 }
             await self._save_data()
-            yield event.plain_result(f"✅ 活动 “{event_name}” 创建成功！\nBoss: {boss_name}\n结束时间: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
+            yield event.plain_result(f"✅ 活动 “{event_name}” 创建成功！\nBoss: {boss_name}\n结束时间: {(datetime.now(timezone.utc) + delta).strftime('%Y-%m-%d %H:%M:%S')} (UTC)")
         else:
             yield event.plain_result(f"错误：未知的活动类型 “{event_type}”。目前只支持“世界Boss”。")
 

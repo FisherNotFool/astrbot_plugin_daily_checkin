@@ -1189,9 +1189,3 @@ class DailyCheckinPlugin(Star):
         - 取消后台任务
         - 执行最终的数据保存
         """
-        if self.save_task:
-            self.save_task.cancel()
-            logger.info("后台定时保存任务已取消。")
-
-        await self._save_data()
-        logger.info("数据已成功保存。")

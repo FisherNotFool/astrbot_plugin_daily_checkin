@@ -181,3 +181,37 @@ def calculate_success_rate(enhancement_level: int) -> float:
     else:
         # 指数衰减：从40%收敛到10%
         return 0.1 + 0.3 * math.exp(-0.15 * (n - 20))
+
+def calculate_boss_stats(boss_name: str, base_five_stats: Dict) -> Dict:
+    """
+    根据Boss的基础五维和专属公式，生成一个兼容战斗引擎的属性块。
+    """
+    S = base_five_stats.get("S", 0)
+    T = base_five_stats.get("T", 0)
+    A = base_five_stats.get("A", 0)
+    C = base_five_stats.get("C", 0)
+    I = base_five_stats.get("I", 0)
+
+    def safe_div(numerator, denominator):
+        return numerator / denominator if denominator != 0 else 0
+
+    # 计算衍生属性
+    derivatives = {
+        "HP": 500 * T + 100 * S + 50 * I,
+        "ATK": 4 * S + A + 0.2 * I,
+        "DEF": 10 * T + 5 * S + 2 * (math.sqrt(A) if A > 0 else 0),
+        "SPD": 0.5 * A + 0.1 * I,
+        "CRIT": (5 + 10 * safe_div(I, I + 100)) / 100,
+        "CRIT_MUL": 1.5 + 0.005 * S,
+        "HIT": (90 + 5 * safe_div(I, I + 200)) / 100,
+        "EVD": (2 + 5 * safe_div(A, A + 200)) / 100,
+        "BLK": (30 * safe_div(T, T + 80) + 10 * safe_div(S, S + 150)) / 100,
+        "BLK_MUL": 0.2 + 0.25 * safe_div(T, T + 100)
+    }
+
+    # 组装成兼容 simulate_battle 的格式
+    battle_ready_stats = {"name": boss_name}
+    for key, value in derivatives.items():
+        battle_ready_stats[key] = {"final": value}
+
+    return battle_ready_stats

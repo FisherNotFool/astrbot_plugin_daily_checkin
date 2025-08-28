@@ -35,10 +35,12 @@ class DailyCheckinPlugin(Star):
         plugin_data_dir = StarTools.get_data_dir("daily_checkin")
         self.user_data_path = plugin_data_dir / "user_data.json"
         self.shop_data_path = plugin_data_dir / "shop_data.json"
+        self.event_data_path = plugin_data_dir / "active_event.json"
 
         self.user_data: Dict = {}
         self.shop_data: Dict = {}
         self.fortunes: Dict = {} # 存储签文
+        self.active_event: Dict = {} #存储激活的活动
         self.game_constants: Dict = {}    # 存储游戏预设
         self.equipment_presets: Dict = {} # 存储装备预设
 
@@ -100,6 +102,14 @@ class DailyCheckinPlugin(Star):
                 logger.info("未找到商店数据文件，将创建新文件。")
                 self.shop_data = {}
 
+            try:
+                with open(self.event_data_path, 'r', encoding='utf-8') as f:
+                    self.active_event = json.load(f)
+                logger.info("成功加载活动数据。")
+            except FileNotFoundError:
+                logger.info("未找到活动数据文件，将创建新文件。")
+                self.active_event = {}
+
     async def _save_data(self):
         async with self.data_lock:
             try:
@@ -107,6 +117,8 @@ class DailyCheckinPlugin(Star):
                     json.dump(self.user_data, f, ensure_ascii=False, indent=4)
                 with open(self.shop_data_path, 'w', encoding='utf-8') as f:
                     json.dump(self.shop_data, f, ensure_ascii=False, indent=4)
+                with open(self.event_data_path, 'w', encoding='utf-8') as f:
+                    json.dump(self.active_event, f, ensure_ascii=False, indent=4)
             except Exception as e:
                 logger.error(f"保存数据时发生错误: {e}")
 

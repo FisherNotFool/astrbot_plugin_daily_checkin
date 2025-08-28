@@ -3,7 +3,6 @@ import json
 from pathlib import Path
 from typing import Dict
 import random
-import re
 from datetime import date, timedelta, timezone, datetime
 from typing import Dict, Optional, Tuple
 
@@ -832,29 +831,35 @@ class DailyCheckinPlugin(Star):
 
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("创建活动")
-    async def create_event(self, event: AstrMessageEvent, *, args: str):
+    async def create_event(self, event: AstrMessageEvent): # [核心修复] 1. 简化函数签名
         """
         [管理员] 创建一个新活动。
-        使用键值对格式，例如: /创建活动 活动名称=炎魔来袭 类型=世界Boss ...
         """
         if self.active_event.get("is_active"):
-            yield event.plain_result(f"错误：当前已有活动 “{self.active_event.get('event_name', '未知')}” 正在进行。请先删除或等待其结束。")
+            yield event.plain_result(f"错误：当前已有活动 “{self.active_event.get('event_name', '未知')}” 正在进行。")
             return
 
-        # 1. [已修复] 使用更健壮的参数解析器
+        # [核心修复] 2. 从原始消息中手动提取参数字符串
+        raw_message = event.message_str
         try:
-            # 使用 args.split() 智能处理各种空格情况
-            params = dict(item.strip().split('=', 1) for item in args.split())
+            # 找到第一个空格，它之后的所有内容都是我们的参数
+            args_str = raw_message.split(' ', 1)[1]
+        except IndexError:
+            # 如果用户只输入了 "/创建活动" 而没有任何参数
+            args_str = ""
 
+        # 3. 使用之前的健壮解析器
+        try:
+            params = dict(item.strip().split('=', 1) for item in args_str.split())
             event_name = params['活动名称']
             event_type = params['类型']
             duration_str = params['时长']
             five_stats_str = params['五维']
             rewards_str = params['奖励']
-            boss_name = params.get('名称', event_name) # Boss名称可选，默认为活动名称
+            boss_name = params.get('名称', event_name)
 
         except (ValueError, KeyError) as e:
-            # 2. [已优化] 提供更详细的错误报告
+            # ... (这部分错误处理代码保持不变)
             error_type = "缺少必需的参数或格式错误" if isinstance(e, KeyError) else "参数分割错误"
             yield event.plain_result(
                 f"❌ 参数解析失败！\n"

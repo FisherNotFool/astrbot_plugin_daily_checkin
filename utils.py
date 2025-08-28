@@ -197,8 +197,8 @@ def calculate_boss_stats(boss_name: str, base_five_stats: Dict) -> Dict:
 
     # 计算衍生属性
     derivatives = {
-        "HP": 500 * T + 100 * S + 50 * I,
-        "ATK": 8 * S + A + 0.5 * I,
+        "HP": 400 * T + 100 * S + 50 * I,
+        "ATK": 12 * S + A + 0.5 * I,
         "DEF": 10 * T + 5 * S + 2 * (math.sqrt(A) if A > 0 else 0),
         "SPD": 0.5 * A + 0.1 * I,
         "CRIT": (5 + 10 * safe_div(I, I + 100)) / 100,

@@ -977,6 +977,23 @@ class DailyCheckinPlugin(Star):
             except (ValueError, TypeError):
                 time_left_str = "未知"
 
+            derived_stats = details.get("derived_stats", {})
+            boss_stats_lines = ["\n--- ⚜️ Boss 详细属性 ⚜️ ---"]
+            attr_map = [
+                ("ATK", "攻击力", "💥", False), ("DEF", "防御力", "🛡️", False),
+                ("SPD", "速度", "⚡", False), ("HIT", "命中率", "🎯", True),
+                ("EVD", "闪避率", "🍃", True), ("CRIT", "暴击率", "💥", True),
+                ("CRIT_MUL", "暴击倍率", "☠️", True), ("BLK", "格挡率", "🛡️", True),
+                ("BLK_MUL", "格挡减伤", "🩹", True)
+            ]
+            for key, name, emoji, is_percent in attr_map:
+                value = derived_stats.get(key, 0)
+                if is_percent:
+                    boss_stats_lines.append(f"{emoji} {name}: {value:.2%}")
+                else:
+                    boss_stats_lines.append(f"{emoji} {name}: {value:.1f}")
+            boss_stats_str = "\n".join(boss_stats_lines)
+
             # 2. 构建伤害排行榜
             # sorted() 函数返回一个列表，其中每个元素都是 (user_id, {damage_info}) 的元组
             sorted_participants = sorted(
@@ -1005,6 +1022,7 @@ class DailyCheckinPlugin(Star):
                 f"Boss: {boss_name}\n"
                 f"血量: {hp_percent:.2%} ({int(current_hp)}/{int(max_hp)})\n"
                 f"剩余时间: {time_left_str}\n"
+                f"{boss_stats_str}\n"
                 f"{'\n'.join(ranking_lines)}"
             )
 
@@ -1039,9 +1057,9 @@ class DailyCheckinPlugin(Star):
                 return
 
             participant_info = self.active_event["participants"].get(user_id, {})
-            #if participant_info.get("last_attack_date") == today_str:
-                #yield event.plain_result("你今天已经挑战过Boss了，明天再来吧！")
-                #return
+            if participant_info.get("last_attack_date") == today_str:
+                yield event.plain_result("你今天已经挑战过Boss了，明天再来吧！")
+                return
 
             event_details = self.active_event["event_details"]
             boss_name = event_details["boss_name"]
@@ -1123,12 +1141,20 @@ class DailyCheckinPlugin(Star):
             damage_share = player_damage / total_damage_all
 
             player_rewards = {}
-            # 分配人品、抽奖券、强化石 (向下取整)
-            for key in ["rp", "draw_tickets", "enhancement_stones"]:
+            player_rewards = {}
+            # [已修复] 1. 单独处理 'rp' 奖励
+            rp_reward_amount = int(final_reward_pool.get("rp", 0) * damage_share)
+            if rp_reward_amount > 0:
+                self.user_data[user_id]["rp"] = self.user_data[user_id].get("rp", 0) + rp_reward_amount
+                player_rewards["rp"] = rp_reward_amount
+
+            # 2. 处理 'resources' 中的奖励
+            for key in ["draw_tickets", "enhancement_stones"]:
                 reward_amount = int(final_reward_pool.get(key, 0) * damage_share)
                 if reward_amount > 0:
                     self.user_data[user_id]["resources"][key] = self.user_data[user_id].get("resources", {}).get(key, 0) + reward_amount
                     player_rewards[key] = reward_amount
+
 
             # 分配属性点 (保留一位小数)
             attr_points_total = final_reward_pool.get("random_attribute_points", 0.0)
@@ -1163,7 +1189,9 @@ class DailyCheckinPlugin(Star):
         # 5. 清空当前活动
         self.active_event = {}
         return "\n".join(report_lines)
+    
 
+    @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("结算活动")
     async def settle_event(self, event: AstrMessageEvent):
         """[管理员] 手动结算已超时的活动。"""

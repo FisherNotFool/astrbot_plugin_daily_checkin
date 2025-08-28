@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 from typing import Dict
 import random
+import re
 from datetime import date, timedelta, timezone, datetime
 from typing import Dict, Optional, Tuple
 
@@ -838,28 +839,39 @@ class DailyCheckinPlugin(Star):
         """
         # 注意: 权限检查之后再添加，我们先实现功能
         if self.active_event.get("is_active"):
-            yield event.plain_result(f"\n错误：当前已有活动 “{self.active_event.get('event_name', '未知')}” 正在进行。请先删除或等待其结束。")
+            yield event.plain_result(f"错误：当前已有活动 “{self.active_event.get('event_name', '未知')}” 正在进行。请先删除或等待其结束。")
             return
 
-        # 1. 参数解析器
+        # 1. [核心修正] 使用正则表达式进行健壮的参数解析
         try:
-            params = dict(item.strip().split('=', 1) for item in args.split(' '))
+            # 这个正则表达式可以匹配 key="value with space" 或者 key=valuewithoutspace
+            pattern = re.compile(r'(\S+?)=(".*?"|[\S,:]+)')
+            matches = pattern.findall(args)
+            # 将匹配结果转换为字典，并去除值中的引号
+            params = {k: v.strip('"') for k, v in matches}
+
+            # 确认所有必需的键都存在
+            required_keys = ['活动名称', '类型', '时长', '五维', '奖励']
+            if not all(key in params for key in required_keys):
+                raise KeyError("缺少必要的参数")
+
             event_name = params['活动名称']
             event_type = params['类型']
             duration_str = params['时长']
             five_stats_str = params['五维']
             rewards_str = params['奖励']
-            boss_name = params.get('名称', event_name) # Boss名称可选，默认为活动名称
-        except (ValueError, KeyError) as e:
+            boss_name = params.get('名称', event_name)
+        except (KeyError, ValueError) as e:
+            # 统一的错误出口，提示正确的格式
             yield event.plain_result(
-                "\n参数解析失败！请使用正确的键值对格式，并确保包含所有必需项。\n\n"
-                "模板: /创建活动 活动名称=[文本] 类型=世界Boss 名称=[Boss名称] 时长=[数字][d/h/m] 五维=[格式] 奖励=[格式]\n\n"
+                f"参数解析失败或缺少必要项 ({e})！请使用正确的键值对格式。\n\n"
+                "模板: /创建活动 活动名称=[文本] 类型=世界Boss 名称=[可选] 时长=[数字][d/h/m] 五维=[格式] 奖励=[格式]\n\n"
                 "五维格式示例: S:500,A:150,T:800,I:200,C:100\n"
                 "奖励格式示例: 人品:10000,抽奖券:100,强化石:200,属性点:10"
             )
             return
 
-        # 2. 详细参数处理与校验
+        # 2. 详细参数处理与校验 (这部分逻辑不变)
         try:
             # 处理时长
             unit = duration_str[-1].lower()
@@ -886,10 +898,9 @@ class DailyCheckinPlugin(Star):
             yield event.plain_result(f"参数内容格式错误: {e}")
             return
 
-        # 3. 创建活动数据
+        # 3. 创建活动数据 (这部分逻辑不变)
         if event_type == "世界Boss":
             boss_stats_full = utils.calculate_boss_stats(boss_name, base_five_stats)
-
             async with self.data_lock:
                 self.active_event = {
                     "event_name": event_name,
@@ -911,6 +922,7 @@ class DailyCheckinPlugin(Star):
         else:
             yield event.plain_result(f"错误：未知的活动类型 “{event_type}”。目前只支持“世界Boss”。")
 
+
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("删除活动")
     async def delete_event(self, event: AstrMessageEvent, event_name: str):
@@ -931,6 +943,7 @@ class DailyCheckinPlugin(Star):
 
         await self._save_data()
         yield event.plain_result(f"✅ 活动 “{event_name}” 已被强制删除。")
+
 
 
     async def terminate(self):

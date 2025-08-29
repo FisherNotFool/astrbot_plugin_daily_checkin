@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 from pathlib import Path
 from typing import Dict
 import random
@@ -115,10 +116,16 @@ class DailyCheckinPlugin(Star):
             try:
                 with open(self.user_data_path, 'w', encoding='utf-8') as f:
                     json.dump(self.user_data, f, ensure_ascii=False, indent=4)
+                    f.flush()
+                    os.fsync(f.fileno())
                 with open(self.shop_data_path, 'w', encoding='utf-8') as f:
                     json.dump(self.shop_data, f, ensure_ascii=False, indent=4)
+                    f.flush()
+                    os.fsync(f.fileno())
                 with open(self.event_data_path, 'w', encoding='utf-8') as f:
                     json.dump(self.active_event, f, ensure_ascii=False, indent=4)
+                    f.flush()
+                    os.fsync(f.fileno())
             except Exception as e:
                 logger.error(f"保存数据时发生错误: {e}")
 

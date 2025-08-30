@@ -1024,7 +1024,7 @@ class DailyCheckinPlugin(Star):
 
             # 3. [新增] 构建奖池展示
             reward_pool = details.get("reward_pool", {})
-            pool_lines = ["\n--- 💰 活动总奖池 💰 ---"]
+            pool_lines = ["--- 💰 活动总奖池 💰 ---"]
             if "rp" in reward_pool: pool_lines.append(f"💰 人品: {int(reward_pool['rp'])}")
             if "draw_tickets" in reward_pool: pool_lines.append(f"🎟️ 抽奖券: {reward_pool['draw_tickets']}")
             if "enhancement_stones" in reward_pool: pool_lines.append(f"💎 强化石: {reward_pool['enhancement_stones']}")

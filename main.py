@@ -1022,7 +1022,17 @@ class DailyCheckinPlugin(Star):
             if not sorted_participants:
                 ranking_lines.append("还没有勇士发起挑战...")
 
-            # 3. 组装最终回复
+            # 3. [新增] 构建奖池展示
+            reward_pool = details.get("reward_pool", {})
+            pool_lines = ["\n--- 💰 活动总奖池 💰 ---"]
+            if "rp" in reward_pool: pool_lines.append(f"💰 人品: {int(reward_pool['rp'])}")
+            if "draw_tickets" in reward_pool: pool_lines.append(f"🎟️ 抽奖券: {reward_pool['draw_tickets']}")
+            if "enhancement_stones" in reward_pool: pool_lines.append(f"💎 强化石: {reward_pool['enhancement_stones']}")
+            if "random_attribute_points" in reward_pool: pool_lines.append(f"⭐ 随机属性点: {reward_pool['random_attribute_points']:.1f}")
+            reward_pool_str = "\n".join(pool_lines)
+
+
+            # 4. 组装最终回复
             boss_name = details.get("boss_name", "未知Boss")
             reply = (
                 f"\n--- 🔥 活动状态 🔥 ---\n"
@@ -1030,8 +1040,10 @@ class DailyCheckinPlugin(Star):
                 f"血量: {hp_percent:.2%} ({int(current_hp)}/{int(max_hp)})\n"
                 f"剩余时间: {time_left_str}\n"
                 f"{boss_stats_str}\n"
+                f"{reward_pool_str}\n"  # 添加奖池分栏
                 f"{'\n'.join(ranking_lines)}"
             )
+
 
             yield event.plain_result(reply)
 
@@ -1163,14 +1175,26 @@ class DailyCheckinPlugin(Star):
                     player_rewards[key] = reward_amount
 
 
-            # 分配属性点 (保留一位小数)
+            # [已重构] 分配属性点 (按0.1粒度多次随机分配)
             attr_points_total = final_reward_pool.get("random_attribute_points", 0.0)
             attr_points_gain = round(attr_points_total * damage_share, 1)
-            if attr_points_gain > 0:
+
+            # 计算需要分配的次数
+            allocation_times = int(attr_points_gain / 0.1)
+
+            if allocation_times > 0:
                 attr_keys = list(self.INITIAL_ATTRIBUTES.keys())
-                chosen_attr = random.choice(attr_keys)
-                self.user_data[user_id]["attributes"][chosen_attr] = round(self.user_data[user_id]["attributes"][chosen_attr] + attr_points_gain, 1)
-                player_rewards["attribute_points"] = (chosen_attr, attr_points_gain)
+                gained_attr_summary = {} # 用于记录每个属性增加了多少
+
+                for _ in range(allocation_times):
+                    # 每次都随机选择一个属性
+                    chosen_attr = random.choice(attr_keys)
+                    self.user_data[user_id]["attributes"][chosen_attr] = round(self.user_data[user_id]["attributes"][chosen_attr] + 0.1, 1)
+                    gained_attr_summary[chosen_attr] = gained_attr_summary.get(chosen_attr, 0) + 0.1
+
+                # 将汇总后的结果存入奖励报告
+                player_rewards["attribute_points"] = gained_attr_summary
+
 
             if player_rewards:
                 distributed_rewards_summary[user_id] = player_rewards
@@ -1188,7 +1212,12 @@ class DailyCheckinPlugin(Star):
             if "rp" in player_rewards: rewards_str_parts.append(f"人品+{player_rewards['rp']}")
             if "draw_tickets" in player_rewards: rewards_str_parts.append(f"抽奖券+{player_rewards['draw_tickets']}")
             if "enhancement_stones" in player_rewards: rewards_str_parts.append(f"强化石+{player_rewards['enhancement_stones']}")
-            if "attribute_points" in player_rewards: rewards_str_parts.append(f"{player_rewards['attribute_points'][0].capitalize()}+{player_rewards['attribute_points'][1]}")
+            if "attribute_points" in player_rewards:
+                attr_summary = player_rewards["attribute_points"]
+                # 将 {'strength': 0.2, 'agility': 0.3} 格式化为 "力量+0.2, 敏捷+0.3"
+                parts = [f"{k.capitalize()}+{v:.1f}" for k, v in attr_summary.items()]
+                rewards_str_parts.append(", ".join(parts))
+
 
             rewards_str = ", ".join(rewards_str_parts) if rewards_str_parts else "无"
             report_lines.append(f"No.{i+1} {nickname} - {damage}伤害 [{rewards_str}]")

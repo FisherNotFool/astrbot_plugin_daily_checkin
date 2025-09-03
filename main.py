@@ -807,7 +807,7 @@ class DailyCheckinPlugin(Star):
             defender_stats['name'] = target_nickname
 
             # 3. 调用战斗模拟器
-            winner_name, battle_log = battle.simulate_battle(challenger_stats, defender_stats)
+            winner_name, battle_log, _damage_report = battle.simulate_battle(challenger_stats, defender_stats)
 
             # 4. 发送战报
             yield event.plain_result(battle_log)
